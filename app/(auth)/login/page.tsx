@@ -2,21 +2,22 @@
 
 import { useActionState } from "react";
 import { loginAction } from "./actions";
+import Logo from "@/components/ui/logo";
 
 export default function LoginPage() {
   const [state, formAction, isPending] = useActionState(loginAction, null);
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-6">
+    <main className="flex min-h-screen items-center justify-center bg-bg p-6">
       <div className="w-full max-w-sm">
-        <h1 className="mb-8 text-center text-2xl font-bold text-gray-900">
-          DENCO Health
-        </h1>
+        <div className="mb-8 flex justify-center">
+          <Logo size="large" />
+        </div>
         <form action={formAction} className="space-y-4">
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-text-secondary"
             >
               Пароль
             </label>
@@ -26,16 +27,16 @@ export default function LoginPage() {
               type="password"
               autoComplete="current-password"
               required
-              className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-xl border border-border bg-card px-4 py-3 text-text placeholder-text-secondary shadow-none transition-colors duration-200 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
           {state?.error && (
-            <p className="text-sm text-red-600">{state.error}</p>
+            <p className="text-sm text-danger">{state.error}</p>
           )}
           <button
             type="submit"
             disabled={isPending}
-            className="w-full rounded-lg bg-blue-600 px-4 py-2 text-white font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+            className="w-full rounded-xl bg-accent px-4 py-3 text-base font-semibold text-white transition-all duration-200 hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg disabled:opacity-40"
           >
             {isPending ? "Вход..." : "Войти"}
           </button>

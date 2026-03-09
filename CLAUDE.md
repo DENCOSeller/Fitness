@@ -33,6 +33,7 @@ Single Next.js app — и фронтенд, и бэкенд. Без отдель
 Chunk 1 (инициализация проекта) — готов.
 Chunk 2 (БД Prisma + PostgreSQL) — готов.
 Chunk 3 (авторизация) — готов.
+Chunk 4 (layout и навигация) — готов.
 
 ## Commands
 

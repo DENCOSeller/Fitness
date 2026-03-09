@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model CheckIn {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @unique @db.Date
+  wellbeing Int
+  sleep     Int
+  stress    Int
+  energy    Int
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("check_ins")
+}
+
+model Exercise {
+  id          Int      @id @default(autoincrement())
+  name        String
+  muscleGroup String   @map("muscle_group")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workoutSets       WorkoutSet[]
+  templateExercises TemplateExercise[]
+
+  @@map("exercises")
+}
+
+model Workout {
+  id          Int      @id @default(autoincrement())
+  date        DateTime @db.Date
+  type        String
+  durationMin Int?     @map("duration_min")
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  sets WorkoutSet[]
+
+  @@map("workouts")
+}
+
+model WorkoutSet {
+  id         Int      @id @default(autoincrement())
+  workoutId  Int      @map("workout_id")
+  exerciseId Int      @map("exercise_id")
+  setOrder   Int      @map("set_order")
+  reps       Int
+  weight     Float
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  workout  Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
+
+  @@map("workout_sets")
+}
+
+model WorkoutTemplate {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  exercises TemplateExercise[]
+
+  @@map("workout_templates")
+}
+
+model TemplateExercise {
+  id         Int   @id @default(autoincrement())
+  templateId Int   @map("template_id")
+  exerciseId Int   @map("exercise_id")
+  sets       Int
+  reps       Int
+  weight     Float
+  sortOrder  Int   @map("sort_order")
+
+  template WorkoutTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  exercise Exercise        @relation(fields: [exerciseId], references: [id])
+
+  @@map("template_exercises")
+}
+
+model Meal {
+  id         Int      @id @default(autoincrement())
+  date       DateTime @db.Date
+  mealType   String   @map("meal_type")
+  description String?
+  photoPath  String?  @map("photo_path")
+  aiAnalysis String?  @map("ai_analysis")
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("meals")
+}
+
+model BodyMetric {
+  id             Int      @id @default(autoincrement())
+  date           DateTime @db.Date
+  weight         Float?
+  bodyFatPct     Float?   @map("body_fat_pct")
+  muscleMass     Float?   @map("muscle_mass")
+  bmi            Float?
+  waterPct       Float?   @map("water_pct")
+  screenshotPath String?  @map("screenshot_path")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("body_metrics")
+}
+
+model HealthDaily {
+  id             Int      @id @default(autoincrement())
+  date           DateTime @unique @db.Date
+  steps          Int?
+  activeCalories Int?     @map("active_calories")
+  restingHr      Int?     @map("resting_hr")
+  sleepHours     Float?   @map("sleep_hours")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("health_daily")
+}
+
+model HealthWorkout {
+  id          Int      @id @default(autoincrement())
+  date        DateTime @db.Date
+  type        String
+  durationMin Int?     @map("duration_min")
+  calories    Int?
+  source      String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("health_workouts")
+}
+
+model AiInsight {
+  id               Int      @id @default(autoincrement())
+  date             DateTime @db.Date
+  type             String
+  model            String
+  promptTokens     Int?     @map("prompt_tokens")
+  completionTokens Int?     @map("completion_tokens")
+  content          String
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@map("ai_insights")
+}

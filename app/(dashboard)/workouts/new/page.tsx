@@ -6,6 +6,7 @@ import { createWorkout, createExerciseFromWorkout } from '../actions';
 import { getExercises } from '../../exercises/actions';
 import SetInput from '@/components/workout/set-input';
 import ExercisePicker from '@/components/workout/exercise-picker';
+import RestTimer from '@/components/workout/rest-timer';
 
 interface Exercise {
   id: number;
@@ -32,6 +33,7 @@ export default function NewWorkoutPage() {
 
   const [allExercises, setAllExercises] = useState<Exercise[]>([]);
   const [showPicker, setShowPicker] = useState(false);
+  const [showTimer, setShowTimer] = useState(false);
 
   useEffect(() => {
     getExercises().then(setAllExercises);
@@ -236,12 +238,23 @@ export default function NewWorkoutPage() {
               ))}
             </div>
 
-            <button
-              onClick={() => addSet(exIdx)}
-              className="w-full text-accent text-sm py-1.5 hover:bg-accent/10 rounded-lg transition-colors"
-            >
-              + Добавить подход
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => addSet(exIdx)}
+                className="flex-1 text-accent text-sm py-1.5 hover:bg-accent/10 rounded-lg transition-colors"
+              >
+                + Подход
+              </button>
+              <button
+                onClick={() => setShowTimer(true)}
+                className="text-text-secondary text-sm py-1.5 px-3 hover:bg-accent/10 hover:text-accent rounded-lg transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 inline mr-1 -mt-0.5">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clipRule="evenodd" />
+                </svg>
+                Отдых
+              </button>
+            </div>
           </div>
         ))}
 
@@ -252,6 +265,10 @@ export default function NewWorkoutPage() {
           + Добавить упражнение
         </button>
       </div>
+
+      {showTimer && (
+        <RestTimer onClose={() => setShowTimer(false)} />
+      )}
 
       <button
         onClick={handleSave}

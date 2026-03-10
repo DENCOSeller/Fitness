@@ -1,7 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { loadChatHistory, loadChatSessions, clearChat } from './actions';
+import { parseWorkoutPlan } from '@/lib/workout-plan-parser';
+import { createWorkoutFromPlan } from './workout-from-plan';
 import Link from 'next/link';
 
 interface Message {
@@ -36,6 +39,9 @@ export default function TrainerPage() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [showSessions, setShowSessions] = useState(false);
   const [error, setError] = useState('');
+
+  const [creatingWorkout, setCreatingWorkout] = useState<number | null>(null);
+  const router = useRouter();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -173,6 +179,20 @@ export default function TrainerPage() {
     await clearChat(sid);
     setSessions(prev => prev.filter(s => s.sessionId !== sid));
     if (sid === sessionId) startNewChat();
+  };
+
+  const handleCreateWorkout = async (msgIndex: number, content: string) => {
+    const exercises = parseWorkoutPlan(content);
+    if (!exercises) return;
+    setCreatingWorkout(msgIndex);
+    try {
+      const result = await createWorkoutFromPlan(exercises);
+      if (result.success && result.id) {
+        router.push(`/workouts/${result.id}`);
+      }
+    } catch {
+      setCreatingWorkout(null);
+    }
   };
 
   const formatDate = (d: Date) => {
@@ -359,6 +379,19 @@ export default function TrainerPage() {
                     <span className={`text-[10px] text-[#636366] mt-1 px-1 ${isUser ? 'self-end' : 'self-start'}`}>
                       {msg.timestamp}
                     </span>
+                  )}
+                  {/* Create workout button for AI plans */}
+                  {!isUser && !isStreaming && msg.content && parseWorkoutPlan(msg.content) && (
+                    <button
+                      onClick={() => handleCreateWorkout(i, msg.content)}
+                      disabled={creatingWorkout === i}
+                      className="mt-2 self-start flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0A84FF]/15 text-[#0A84FF] text-xs font-medium hover:bg-[#0A84FF]/25 active:scale-[0.97] transition-all disabled:opacity-50"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                      </svg>
+                      {creatingWorkout === i ? 'Создаю...' : 'Создать тренировку'}
+                    </button>
                   )}
                 </div>
               </div>

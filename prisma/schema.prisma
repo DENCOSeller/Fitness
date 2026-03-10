@@ -82,6 +82,7 @@ model Workout {
   userId      Int      @map("user_id")
   date        DateTime @db.Date
   type        String
+  status      String   @default("completed") // planned | completed
   durationMin Int?     @map("duration_min")
   note        String?
   createdAt   DateTime @default(now()) @map("created_at")

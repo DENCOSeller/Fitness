@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { getWorkout, deleteWorkout } from '../actions';
+import { getWorkout, deleteWorkout, completeWorkout } from '../actions';
 import { createTemplateFromWorkout } from '../templates/actions';
 
 interface WorkoutSet {
@@ -22,6 +22,7 @@ interface WorkoutDetail {
   id: number;
   date: string | Date;
   type: string;
+  status?: string;
   durationMin: number | null;
   note: string | null;
   sets: WorkoutSet[];
@@ -127,6 +128,27 @@ export default function WorkoutDetailPage({ params }: { params: Promise<{ id: st
           {isPending ? '...' : confirmDelete ? 'Точно удалить?' : 'Удалить'}
         </button>
       </div>
+
+      {workout.status === 'planned' && (
+        <div className="bg-accent/10 border border-accent/30 rounded-2xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span>📋</span>
+            <span className="text-sm font-medium text-accent">Запланированная тренировка</span>
+          </div>
+          <button
+            onClick={() => {
+              startTransition(async () => {
+                await completeWorkout(parseInt(id));
+                setWorkout(prev => prev ? { ...prev, status: 'completed' } : prev);
+              });
+            }}
+            disabled={isPending}
+            className="px-3 py-1.5 rounded-xl bg-accent text-white text-xs font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+          >
+            {isPending ? '...' : 'Выполнено'}
+          </button>
+        </div>
+      )}
 
       <div className="bg-card rounded-2xl p-5">
         <div className="flex items-start justify-between mb-3">

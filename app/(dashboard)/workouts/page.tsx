@@ -8,6 +8,7 @@ interface WorkoutWithSets {
   id: number;
   date: string | Date;
   type: string;
+  status?: string;
   durationMin: number | null;
   note: string | null;
   sets: {
@@ -98,47 +99,74 @@ export default function WorkoutsPage() {
         </div>
       )}
 
-      {workouts.map((w) => {
-        const uniqueExercises = getUniqueExercises(w.sets);
-        const volume = getTotalVolume(w.sets);
-        const cardioSummary = getCardioSummary(w.sets);
+      {(() => {
+        const planned = workouts.filter(w => w.status === 'planned');
+        const completed = workouts.filter(w => w.status !== 'planned');
+        const sections: { label: string | null; items: WorkoutWithSets[] }[] = [];
+        if (planned.length > 0) sections.push({ label: 'Запланированные', items: planned });
+        if (completed.length > 0) sections.push({ label: planned.length > 0 ? 'Выполненные' : null, items: completed });
 
-        return (
-          <Link
-            key={w.id}
-            href={`/workouts/${w.id}`}
-            className="block bg-card rounded-2xl p-4 hover:bg-card-hover transition-colors"
-          >
-            <div className="flex items-start justify-between mb-2">
-              <div>
-                <span className="text-text font-semibold text-sm">{w.type}</span>
-                {w.durationMin && (
-                  <span className="text-text-secondary text-xs ml-2">{w.durationMin} мин</span>
-                )}
-              </div>
-              <span className="text-text-secondary text-xs">{formatDate(w.date)}</span>
-            </div>
+        return sections.map((section) => (
+          <div key={section.label ?? 'all'} className="space-y-3">
+            {section.label && (
+              <h2 className="text-sm font-medium text-text-secondary flex items-center gap-1.5">
+                {section.label === 'Запланированные' && <span>📋</span>}
+                {section.label}
+              </h2>
+            )}
+            {section.items.map((w) => {
+              const uniqueExercises = getUniqueExercises(w.sets);
+              const volume = getTotalVolume(w.sets);
+              const cardioSummary = getCardioSummary(w.sets);
+              const isPlanned = w.status === 'planned';
 
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {uniqueExercises.map((s) => (
-                <span
-                  key={s.exercise.id}
-                  className="bg-bg text-text-secondary text-xs px-2 py-0.5 rounded-md"
+              return (
+                <Link
+                  key={w.id}
+                  href={`/workouts/${w.id}`}
+                  className={`block rounded-2xl p-4 transition-colors ${
+                    isPlanned
+                      ? 'bg-accent/10 border border-accent/30 hover:bg-accent/15'
+                      : 'bg-card hover:bg-card-hover'
+                  }`}
                 >
-                  {s.exercise.name}
-                </span>
-              ))}
-            </div>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      {isPlanned && <span className="text-xs">📋</span>}
+                      <span className="text-text font-semibold text-sm">{w.type}</span>
+                      {isPlanned && (
+                        <span className="text-[10px] text-accent bg-accent/15 px-1.5 py-0.5 rounded-md font-medium">ПЛАН</span>
+                      )}
+                      {w.durationMin && (
+                        <span className="text-text-secondary text-xs">{w.durationMin} мин</span>
+                      )}
+                    </div>
+                    <span className="text-text-secondary text-xs">{formatDate(w.date)}</span>
+                  </div>
 
-            <div className="flex gap-4 text-text-secondary text-xs">
-              <span>{uniqueExercises.length} упр.</span>
-              <span>{w._count.sets} подх.</span>
-              {volume > 0 && <span>{volume.toLocaleString('ru-RU')} кг объём</span>}
-              {cardioSummary && <span>{cardioSummary}</span>}
-            </div>
-          </Link>
-        );
-      })}
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {uniqueExercises.map((s) => (
+                      <span
+                        key={s.exercise.id}
+                        className="bg-bg text-text-secondary text-xs px-2 py-0.5 rounded-md"
+                      >
+                        {s.exercise.name}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-4 text-text-secondary text-xs">
+                    <span>{uniqueExercises.length} упр.</span>
+                    <span>{w._count.sets} подх.</span>
+                    {volume > 0 && <span>{volume.toLocaleString('ru-RU')} кг объём</span>}
+                    {cardioSummary && <span>{cardioSummary}</span>}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        ));
+      })()}
     </div>
   );
 }

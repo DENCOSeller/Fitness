@@ -103,6 +103,19 @@ export async function listWorkouts() {
   return workouts;
 }
 
+export async function completeWorkout(id: number) {
+  const userId = await getCurrentUserId();
+  const workout = await prisma.workout.findUnique({ where: { id } });
+  if (!workout || workout.userId !== userId) {
+    return { error: 'Тренировка не найдена' };
+  }
+  await prisma.workout.update({
+    where: { id },
+    data: { status: 'completed' },
+  });
+  return { success: true };
+}
+
 export async function deleteWorkout(id: number) {
   const userId = await getCurrentUserId();
   const workout = await prisma.workout.findUnique({ where: { id } });

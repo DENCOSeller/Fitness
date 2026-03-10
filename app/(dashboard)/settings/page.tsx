@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { logout, changePassword } from './actions';
 import { getCurrentUser, updateProfile } from './user-action';
 import { calculateAge } from '@/lib/user-helpers';
+import EquipmentTab from '@/components/settings/equipment-tab';
 
 const GOAL_OPTIONS = [
   { value: 'loss', label: 'Похудение' },
@@ -33,8 +34,11 @@ function formatDateInput(d: Date | string | null): string {
   return `${y}-${m}-${day}`;
 }
 
+type Tab = 'profile' | 'gym';
+
 export default function SettingsPage() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<Tab>('profile');
   const [loggingOut, setLoggingOut] = useState(false);
   const [user, setUser] = useState<{
     email: string;
@@ -138,8 +142,32 @@ export default function SettingsPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Настройки</h1>
+      <h1 className="text-2xl font-bold mb-4">Настройки</h1>
 
+      {/* Tabs */}
+      <div className="flex gap-1 bg-card rounded-xl p-1 mb-6">
+        <button
+          onClick={() => setActiveTab('profile')}
+          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+            activeTab === 'profile' ? 'bg-accent text-white' : 'text-text-secondary hover:text-text'
+          }`}
+        >
+          Профиль
+        </button>
+        <button
+          onClick={() => setActiveTab('gym')}
+          className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+            activeTab === 'gym' ? 'bg-accent text-white' : 'text-text-secondary hover:text-text'
+          }`}
+        >
+          Мой зал
+        </button>
+      </div>
+
+      {activeTab === 'gym' ? (
+        <EquipmentTab />
+      ) : (
+      <>
       <Section title="Профиль">
         {editingProfile ? (
           <div className="p-4 space-y-3">
@@ -259,6 +287,8 @@ export default function SettingsPage() {
         <Row label="AI" value="Claude API (Anthropic)" />
         <Row label="Сервер" value="Beget VPS / PM2 + Nginx" last />
       </Section>
+      </>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { buildTrainerSystemPrompt, getChatHistory, saveChatMessage } from '@/lib/ai-trainer';
 import { getSessionUserId } from '@/lib/auth';
+import { detectAndSaveEquipment } from '@/lib/equipment-from-chat';
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -22,6 +23,9 @@ export async function POST(request: Request) {
   // Save user message
   await saveChatMessage(sessionId, 'user', message, userId);
 
+  // Detect equipment mentions and save them
+  const equipmentUpdates = await detectAndSaveEquipment(message, userId);
+
   // Build system prompt with full user context
   const systemPrompt = await buildTrainerSystemPrompt(userId);
 
@@ -31,6 +35,22 @@ export async function POST(request: Request) {
     role: m.role as 'user' | 'assistant',
     content: m.content,
   }));
+
+  // If equipment was detected, inject a system hint into the last user message
+  if (equipmentUpdates.length > 0) {
+    const added = equipmentUpdates.filter(e => e.available).map(e => e.name);
+    const removed = equipmentUpdates.filter(e => !e.available).map(e => e.name);
+    const parts: string[] = [];
+    if (added.length > 0) parts.push(`добавлено: ${added.join(', ')}`);
+    if (removed.length > 0) parts.push(`отмечено как недоступное: ${removed.join(', ')}`);
+    const hint = `\n\n[Система: оборудование пользователя обновлено — ${parts.join('; ')}. Подтверди пользователю что записал и будешь учитывать в программах.]`;
+
+    // Append hint to the last user message
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg && lastMsg.role === 'user') {
+      lastMsg.content = lastMsg.content + hint;
+    }
+  }
 
   // Stream response
   const stream = await client.messages.stream({

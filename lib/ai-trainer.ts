@@ -13,7 +13,7 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
   // Fetch user profile and all data in parallel
-  const [user, checkIns, workouts, meals, bodyMetrics, healthDaily, latestMeasurement, systemExercises] = await Promise.all([
+  const [user, checkIns, workouts, meals, bodyMetrics, healthDaily, latestMeasurement, systemExercises, userEquipment] = await Promise.all([
     prisma.user.findUnique({
       where: { id: uid },
       select: { name: true, gender: true, birthDate: true, height: true, goal: true, targetWeight: true, activityLevel: true },
@@ -52,6 +52,10 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
       where: { isSystem: true },
       select: { name: true, muscleGroup: true, description: true, muscleGroups: true, equipment: true, difficulty: true, tips: true },
       orderBy: [{ muscleGroup: 'asc' }, { name: 'asc' }],
+    }),
+    prisma.userEquipment.findMany({
+      where: { userId: uid },
+      select: { name: true, category: true, available: true },
     }),
   ]);
 
@@ -140,6 +144,25 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
       }
     }
     sections.push(`## Каталог упражнений (${systemExercises.length} шт.)\nИспользуй эти упражнения при составлении программ тренировок.\n${lines.join('\n')}`);
+  }
+
+  // User equipment
+  if (userEquipment.length > 0) {
+    const available = userEquipment.filter(e => e.available);
+    const unavailable = userEquipment.filter(e => !e.available);
+    if (available.length > 0) {
+      const byCategory = new Map<string, string[]>();
+      for (const eq of available) {
+        const list = byCategory.get(eq.category) || [];
+        list.push(eq.name);
+        byCategory.set(eq.category, list);
+      }
+      const lines = Array.from(byCategory.entries()).map(([cat, items]) => `${cat}: ${items.join(', ')}`);
+      sections.push(`## Доступное оборудование\nСоставляй программы ТОЛЬКО с этим оборудованием.\n${lines.join('\n')}`);
+    }
+    if (unavailable.length > 0) {
+      sections.push(`## Недоступное оборудование\nНЕ используй: ${unavailable.map(e => e.name).join(', ')}`);
+    }
   }
 
   // User profile + body measurements + latest Picooc

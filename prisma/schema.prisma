@@ -33,6 +33,7 @@ model User {
   chatMessages     ChatMessage[]
   progressPhotos   ProgressPhoto[]
   aiInsights       AiInsight[]
+  equipment        UserEquipment[]
 
   @@map("users")
 }
@@ -264,4 +265,19 @@ model AiInsight {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("ai_insights")
+}
+
+model UserEquipment {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  name      String
+  category  String
+  available Boolean  @default(true)
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@map("user_equipment")
 }

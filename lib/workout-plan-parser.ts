@@ -56,6 +56,26 @@ export function parseWorkoutPlan(text: string): ParsedExercise[] | null {
       });
       continue;
     }
+
+    // Pattern 4: Markdown table row "| Name | 3 | 12 |" or "| Name | 3 | 12 | 60 кг |"
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      const cells = trimmed.split('|').map(c => c.trim()).filter(Boolean);
+      // Skip header/separator rows
+      if (cells.length >= 3 && !cells[1].match(/^[-:]+$/) && cells[0].length > 1) {
+        const name = cells[0].replace(/\*\*/g, '');
+        const setsVal = parseInt(cells[1]);
+        const repsVal = parseInt(cells[2]);
+        if (name && !isNaN(setsVal) && !isNaN(repsVal) && setsVal > 0 && repsVal > 0) {
+          let weight = 0;
+          if (cells[3]) {
+            const wMatch = cells[3].match(/(\d+(?:[.,]\d+)?)/);
+            if (wMatch) weight = parseFloat(wMatch[1].replace(',', '.'));
+          }
+          exercises.push({ name, sets: setsVal, reps: repsVal, weight });
+          continue;
+        }
+      }
+    }
   }
 
   return exercises.length >= 2 ? exercises : null;

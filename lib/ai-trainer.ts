@@ -11,8 +11,12 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
   const sevenDaysAgo = new Date(now);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  // Fetch all user data in parallel
-  const [checkIns, workouts, meals, bodyMetrics, healthDaily] = await Promise.all([
+  // Fetch user profile and all data in parallel
+  const [user, checkIns, workouts, meals, bodyMetrics, healthDaily] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: uid },
+      select: { name: true, age: true, height: true, goal: true, targetWeight: true },
+    }),
     prisma.checkIn.findMany({
       where: { userId: uid, date: { gte: thirtyDaysAgo } },
       orderBy: { date: 'desc' },
@@ -103,6 +107,19 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
       return `${fmt(h.date)}: ${parts.join(', ')}`;
     });
     sections.push(`## Apple Health (последние ${healthDaily.length} дней)\n${lines.join('\n')}`);
+  }
+
+  // User profile
+  const goalLabels: Record<string, string> = { loss: 'похудение', gain: 'набор массы', maintain: 'поддержание формы' };
+  const profileParts: string[] = [];
+  if (user?.name) profileParts.push(`Имя: ${user.name}`);
+  if (user?.age) profileParts.push(`Возраст: ${user.age} лет`);
+  if (user?.height) profileParts.push(`Рост: ${user.height} см`);
+  if (user?.goal) profileParts.push(`Цель: ${goalLabels[user.goal] || user.goal}`);
+  if (user?.targetWeight) profileParts.push(`Целевой вес: ${user.targetWeight} кг`);
+
+  if (profileParts.length > 0) {
+    sections.unshift(`## Профиль\n${profileParts.join('\n')}`);
   }
 
   const context = sections.length > 0

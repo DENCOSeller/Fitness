@@ -12,6 +12,10 @@ model User {
   email        String   @unique
   passwordHash String   @map("password_hash")
   name         String?
+  age          Int?
+  height       Int?     // cm
+  goal         String?  // loss | gain | maintain
+  targetWeight Float?   @map("target_weight") // kg
   createdAt    DateTime @default(now()) @map("created_at")
 
   checkIns         CheckIn[]

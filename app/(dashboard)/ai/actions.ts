@@ -50,7 +50,11 @@ export async function generateDailyInsight() {
   since.setDate(since.getDate() - 7);
   since.setHours(0, 0, 0, 0);
 
-  const [checkIns, workouts, body, meals, health] = await Promise.all([
+  const [user, checkIns, workouts, body, meals, health] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, age: true, height: true, goal: true, targetWeight: true },
+    }),
     prisma.checkIn.findMany({
       where: { userId, date: { gte: since } },
       orderBy: { date: 'desc' },
@@ -79,6 +83,7 @@ export async function generateDailyInsight() {
   ]);
 
   const ctx: DailyContext = {
+    profile: user || undefined,
     checkIns: checkIns.map((c) => ({
       date: c.date,
       wellbeing: c.wellbeing,
@@ -206,7 +211,11 @@ export async function generateWeeklyReport() {
   since.setDate(since.getDate() - 7);
   since.setHours(0, 0, 0, 0);
 
-  const [checkIns, workouts, body, meals, health] = await Promise.all([
+  const [userProfile, checkIns, workouts, body, meals, health] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, age: true, height: true, goal: true, targetWeight: true },
+    }),
     prisma.checkIn.findMany({
       where: { userId, date: { gte: since } },
       orderBy: { date: 'asc' },
@@ -235,6 +244,7 @@ export async function generateWeeklyReport() {
   ]);
 
   const ctx: WeeklyContext = {
+    profile: userProfile || undefined,
     checkIns: checkIns.map((c) => ({
       date: c.date,
       wellbeing: c.wellbeing,

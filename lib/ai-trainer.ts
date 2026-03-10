@@ -13,7 +13,7 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
   // Fetch user profile and all data in parallel
-  const [user, checkIns, workouts, meals, bodyMetrics, healthDaily, latestMeasurement] = await Promise.all([
+  const [user, checkIns, workouts, meals, bodyMetrics, healthDaily, latestMeasurement, systemExercises] = await Promise.all([
     prisma.user.findUnique({
       where: { id: uid },
       select: { name: true, gender: true, birthDate: true, height: true, goal: true, targetWeight: true, activityLevel: true },
@@ -47,6 +47,11 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
     prisma.bodyMeasurement.findFirst({
       where: { userId: uid },
       orderBy: { date: 'desc' },
+    }),
+    prisma.exercise.findMany({
+      where: { isSystem: true },
+      select: { name: true, muscleGroup: true, description: true, muscleGroups: true, equipment: true, difficulty: true, tips: true },
+      orderBy: [{ muscleGroup: 'asc' }, { name: 'asc' }],
     }),
   ]);
 
@@ -112,6 +117,29 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
       return `${fmt(h.date)}: ${parts.join(', ')}`;
     });
     sections.push(`## Apple Health (последние ${healthDaily.length} дней)\n${lines.join('\n')}`);
+  }
+
+  // System exercises catalog for AI trainer
+  if (systemExercises.length > 0) {
+    const byGroup = new Map<string, typeof systemExercises>();
+    for (const ex of systemExercises) {
+      const group = byGroup.get(ex.muscleGroup) || [];
+      group.push(ex);
+      byGroup.set(ex.muscleGroup, group);
+    }
+    const lines: string[] = [];
+    for (const [group, exs] of byGroup) {
+      lines.push(`### ${group}`);
+      for (const ex of exs) {
+        const parts = [`**${ex.name}**`];
+        if (ex.muscleGroups) parts.push(`мышцы: ${ex.muscleGroups}`);
+        if (ex.equipment) parts.push(`оборудование: ${ex.equipment}`);
+        if (ex.difficulty) parts.push(`уровень: ${ex.difficulty}`);
+        if (ex.tips) parts.push(`совет: ${ex.tips}`);
+        lines.push(parts.join(' | '));
+      }
+    }
+    sections.push(`## Каталог упражнений (${systemExercises.length} шт.)\nИспользуй эти упражнения при составлении программ тренировок.\n${lines.join('\n')}`);
   }
 
   // User profile + body measurements + latest Picooc

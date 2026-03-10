@@ -8,6 +8,7 @@ type Exercise = {
   id: number;
   name: string;
   muscleGroup: string;
+  isSystem: boolean;
   _count: { workoutSets: number };
 };
 
@@ -188,7 +189,12 @@ export default function ExercisesPage() {
           {filtered.map((ex) => (
             <div key={ex.id} className="bg-card rounded-2xl p-4 flex items-center justify-between">
               <Link href={`/exercises/${ex.id}`} className="flex-1 min-w-0">
-                <div className="font-medium text-sm">{ex.name}</div>
+                <div className="font-medium text-sm flex items-center gap-1.5">
+                  {ex.name}
+                  {ex.isSystem && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/15 text-accent font-medium">DENCO</span>
+                  )}
+                </div>
                 <div className="text-xs text-text-secondary mt-0.5">
                   {ex.muscleGroup}
                   {ex._count.workoutSets > 0 && (
@@ -198,7 +204,13 @@ export default function ExercisesPage() {
                   )}
                 </div>
               </Link>
-              {ex._count.workoutSets === 0 ? (
+              {ex.isSystem ? (
+                <Link href={`/exercises/${ex.id}`} className="text-text-secondary p-2">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                </Link>
+              ) : ex._count.workoutSets === 0 ? (
                 <button
                   onClick={() => handleDelete(ex.id, ex.name)}
                   disabled={isPending}

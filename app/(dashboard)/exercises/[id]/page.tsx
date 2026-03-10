@@ -19,7 +19,19 @@ type ExerciseData = {
   id: number;
   name: string;
   muscleGroup: string;
+  isSystem: boolean;
+  description: string | null;
+  muscleGroups: string | null;
+  equipment: string | null;
+  difficulty: string | null;
+  tips: string | null;
   history: WorkoutEntry[];
+};
+
+const difficultyLabels: Record<string, string> = {
+  beginner: 'Начинающий',
+  intermediate: 'Средний',
+  advanced: 'Продвинутый',
 };
 
 export default function ExerciseProgressPage() {
@@ -72,9 +84,45 @@ export default function ExerciseProgressPage() {
       {/* Header */}
       <div>
         <Link href="/exercises" className="text-accent text-sm">&larr; Упражнения</Link>
-        <h1 className="text-2xl font-bold mt-1">{data.name}</h1>
+        <h1 className="text-2xl font-bold mt-1 flex items-center gap-2">
+          {data.name}
+          {data.isSystem && (
+            <span className="text-xs px-2 py-0.5 rounded bg-accent/15 text-accent font-medium">DENCO</span>
+          )}
+        </h1>
         <p className="text-text-secondary text-sm">{data.muscleGroup}</p>
       </div>
+
+      {/* Exercise details (system exercises) */}
+      {data.isSystem && (data.description || data.tips) && (
+        <div className="bg-card rounded-2xl p-4 space-y-3">
+          {data.description && (
+            <p className="text-sm text-text">{data.description}</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {data.muscleGroups && (
+              <span className="text-xs bg-card-hover rounded-lg px-2.5 py-1 text-text-secondary">
+                {data.muscleGroups}
+              </span>
+            )}
+            {data.equipment && (
+              <span className="text-xs bg-card-hover rounded-lg px-2.5 py-1 text-text-secondary">
+                {data.equipment}
+              </span>
+            )}
+            {data.difficulty && (
+              <span className="text-xs bg-card-hover rounded-lg px-2.5 py-1 text-text-secondary">
+                {difficultyLabels[data.difficulty] || data.difficulty}
+              </span>
+            )}
+          </div>
+          {data.tips && (
+            <div className="text-xs text-text-secondary border-l-2 border-accent/30 pl-3">
+              {data.tips}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Chart */}
       {data.history.length > 1 ? (

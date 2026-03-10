@@ -6,8 +6,13 @@ import { getCurrentUserId } from '@/lib/auth';
 export async function getExercises() {
   const userId = await getCurrentUserId();
   return prisma.exercise.findMany({
-    where: { userId },
-    orderBy: { name: 'asc' },
+    where: {
+      OR: [
+        { userId },
+        { isSystem: true },
+      ],
+    },
+    orderBy: [{ isSystem: 'desc' }, { name: 'asc' }],
     include: {
       _count: {
         select: { workoutSets: true },
@@ -26,7 +31,12 @@ export async function createExercise(data: { name: string; muscleGroup: string }
   }
 
   const existing = await prisma.exercise.findFirst({
-    where: { userId, name: { equals: name, mode: 'insensitive' } },
+    where: {
+      OR: [
+        { userId, name: { equals: name, mode: 'insensitive' } },
+        { isSystem: true, name: { equals: name, mode: 'insensitive' } },
+      ],
+    },
   });
 
   if (existing) {
@@ -51,8 +61,12 @@ export async function deleteExercise(id: number) {
     },
   });
 
-  if (!exercise || exercise.userId !== userId) {
+  if (!exercise || (exercise.userId !== userId && !exercise.isSystem)) {
     return { error: 'Упражнение не найдено' };
+  }
+
+  if (exercise.isSystem) {
+    return { error: 'Нельзя удалить системное упражнение' };
   }
 
   if (exercise._count.workoutSets > 0 || exercise._count.templateExercises > 0) {

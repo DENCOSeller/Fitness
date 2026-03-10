@@ -56,13 +56,19 @@ model CheckIn {
 }
 
 model Exercise {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @map("user_id")
-  name        String
-  muscleGroup String   @map("muscle_group")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id           Int      @id @default(autoincrement())
+  userId       Int?     @map("user_id")
+  name         String
+  muscleGroup  String   @map("muscle_group")
+  description  String?
+  muscleGroups String?  @map("muscle_groups") // comma-separated
+  equipment    String?
+  difficulty   String?  // beginner | intermediate | advanced
+  tips         String?
+  isSystem     Boolean  @default(false) @map("is_system")
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
   workoutSets       WorkoutSet[]
   templateExercises TemplateExercise[]
 

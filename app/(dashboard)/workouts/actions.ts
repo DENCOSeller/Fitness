@@ -109,7 +109,12 @@ export async function createExerciseFromWorkout(data: { name: string; muscleGrou
   }
 
   const existing = await prisma.exercise.findFirst({
-    where: { userId, name: { equals: name, mode: 'insensitive' } },
+    where: {
+      OR: [
+        { userId, name: { equals: name, mode: 'insensitive' } },
+        { isSystem: true, name: { equals: name, mode: 'insensitive' } },
+      ],
+    },
   });
 
   if (existing) {

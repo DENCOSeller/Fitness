@@ -19,7 +19,7 @@ export async function getExerciseProgress(id: number) {
     },
   });
 
-  if (!exercise || exercise.userId !== userId) {
+  if (!exercise || (exercise.userId !== userId && !exercise.isSystem)) {
     return { error: 'Упражнение не найдено' };
   }
 
@@ -64,6 +64,12 @@ export async function getExerciseProgress(id: number) {
     id: exercise.id,
     name: exercise.name,
     muscleGroup: exercise.muscleGroup,
+    isSystem: exercise.isSystem,
+    description: exercise.description,
+    muscleGroups: exercise.muscleGroups,
+    equipment: exercise.equipment,
+    difficulty: exercise.difficulty,
+    tips: exercise.tips,
     history,
   };
 }

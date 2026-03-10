@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import BodySilhouette from './body-silhouette';
+import MorphingSilhouette from './morphing-silhouette';
 import {
   saveMeasurement,
   getMeasurements,
   deleteMeasurement,
+  getUserHeight,
 } from '@/app/(dashboard)/body/measurements-actions';
 import {
   ALL_ZONES,
@@ -72,12 +74,18 @@ export default function MeasurementsPanel() {
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState('');
+  const [userHeight, setUserHeight] = useState<number | null>(null);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); loadHeight(); }, []);
 
   async function loadData() {
     const list = await getMeasurements();
     setMeasurements(list as unknown as MeasurementRecord[]);
+  }
+
+  async function loadHeight() {
+    const h = await getUserHeight();
+    setUserHeight(h);
   }
 
   // Build zone data for silhouette from latest + previous
@@ -205,6 +213,15 @@ export default function MeasurementsPanel() {
           </div>
         )}
       </div>
+
+      {/* Morphing body silhouette */}
+      {measurements.length > 0 && (
+        <MorphingSilhouette
+          current={measurements[0]}
+          previous={measurements.length > 1 ? measurements[1] : null}
+          height={userHeight}
+        />
+      )}
 
       {/* Zone sparklines grid */}
       {measurements.length > 0 && (

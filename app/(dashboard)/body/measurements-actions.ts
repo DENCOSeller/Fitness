@@ -41,6 +41,15 @@ export async function getMeasurements(limit = 90) {
   });
 }
 
+export async function getUserHeight(): Promise<number | null> {
+  const userId = await getCurrentUserId();
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { height: true },
+  });
+  return user?.height ?? null;
+}
+
 export async function deleteMeasurement(id: number) {
   const userId = await getCurrentUserId();
   const m = await prisma.bodyMeasurement.findUnique({ where: { id } });

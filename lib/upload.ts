@@ -2,7 +2,8 @@ import path from 'path';
 import fs from 'fs/promises';
 import sharp from 'sharp';
 
-const UPLOADS_DIR = path.join(process.cwd(), 'public', 'uploads');
+// Use fixed path so uploads persist across rebuilds (standalone mode uses different cwd)
+const UPLOADS_DIR = path.join('/root/Fitness', 'public', 'uploads');
 const MAX_SIZE_KB = 500;
 
 export async function ensureUploadDir(subdir: string): Promise<string> {
@@ -41,7 +42,7 @@ export async function saveAndCompressImage(
 }
 
 export async function deleteImage(relativePath: string): Promise<void> {
-  const fullPath = path.join(process.cwd(), 'public', relativePath);
+  const fullPath = path.join('/root/Fitness', 'public', relativePath);
   try {
     await fs.unlink(fullPath);
   } catch {

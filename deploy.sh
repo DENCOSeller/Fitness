@@ -20,7 +20,11 @@ npm run build
 
 echo "5. Copying static assets to standalone..."
 cp -r .next/static .next/standalone/.next/static
+# Copy public but preserve uploads as symlink to persistent storage
+rm -rf .next/standalone/public
 cp -r public .next/standalone/public
+rm -rf .next/standalone/public/uploads
+ln -sf /root/Fitness/public/uploads .next/standalone/public/uploads
 
 echo "6. Restarting PM2..."
 pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js

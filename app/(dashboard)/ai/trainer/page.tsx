@@ -178,7 +178,7 @@ export default function TrainerPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[calc(100vh-2rem)]">
+    <div className="flex flex-col h-[calc(100dvh-5rem)] md:h-[calc(100dvh-1rem)] overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
@@ -275,9 +275,10 @@ export default function TrainerPage() {
             </p>
             <div className="grid grid-cols-1 gap-2 w-full max-w-xs">
               {[
-                'Проанализируй мои тренировки за неделю',
-                'Составь план тренировок на неделю',
-                'Как улучшить мой сон?',
+                'Начинаю тренировку, что делать сегодня?',
+                'Что съесть после тренировки?',
+                'Оцени мой прогресс за неделю',
+                'Составь программу на месяц',
               ].map(suggestion => (
                 <button
                   key={suggestion}

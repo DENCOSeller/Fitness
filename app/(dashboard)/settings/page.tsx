@@ -11,6 +11,13 @@ const GOAL_OPTIONS = [
   { value: 'maintain', label: 'Поддержание формы' },
 ];
 
+const ACTIVITY_OPTIONS = [
+  { value: 'sedentary', label: 'Сидячий', desc: '×1.2' },
+  { value: 'light', label: 'Лёгкая активность', desc: '×1.375' },
+  { value: 'moderate', label: 'Средняя активность', desc: '×1.55' },
+  { value: 'active', label: 'Высокая активность', desc: '×1.725' },
+];
+
 export default function SettingsPage() {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -21,6 +28,7 @@ export default function SettingsPage() {
     height: number | null;
     goal: string | null;
     targetWeight: number | null;
+    activityLevel: string | null;
   } | null>(null);
 
   // Profile edit
@@ -30,6 +38,7 @@ export default function SettingsPage() {
   const [profileHeight, setProfileHeight] = useState('');
   const [profileGoal, setProfileGoal] = useState('');
   const [profileTargetWeight, setProfileTargetWeight] = useState('');
+  const [profileActivityLevel, setProfileActivityLevel] = useState('moderate');
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
 
@@ -49,6 +58,7 @@ export default function SettingsPage() {
         setProfileHeight(u.height ? String(u.height) : '');
         setProfileGoal(u.goal || '');
         setProfileTargetWeight(u.targetWeight ? String(u.targetWeight) : '');
+        setProfileActivityLevel(u.activityLevel || 'moderate');
       }
     });
   }, []);
@@ -65,6 +75,7 @@ export default function SettingsPage() {
       height: height && height > 50 && height < 300 ? height : null,
       goal: profileGoal || null,
       targetWeight: targetWeight && targetWeight > 20 && targetWeight < 300 ? targetWeight : null,
+      activityLevel: profileActivityLevel || 'moderate',
     });
     setUser((prev) => prev ? {
       ...prev,
@@ -73,6 +84,7 @@ export default function SettingsPage() {
       height: height && height > 50 && height < 300 ? height : null,
       goal: profileGoal || null,
       targetWeight: targetWeight && targetWeight > 20 && targetWeight < 300 ? targetWeight : null,
+      activityLevel: profileActivityLevel || 'moderate',
     } : prev);
     setSavingProfile(false);
     setEditingProfile(false);
@@ -103,6 +115,7 @@ export default function SettingsPage() {
   };
 
   const goalLabel = GOAL_OPTIONS.find((g) => g.value === user?.goal)?.label || '—';
+  const activityLabel = ACTIVITY_OPTIONS.find((a) => a.value === (user?.activityLevel || 'moderate'))?.label || 'Средняя активность';
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
@@ -125,6 +138,18 @@ export default function SettingsPage() {
                 <option value="">Не выбрана</option>
                 {GOAL_OPTIONS.map((g) => (
                   <option key={g.value} value={g.value}>{g.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-text-secondary mb-1">Уровень активности</label>
+              <select
+                value={profileActivityLevel}
+                onChange={(e) => setProfileActivityLevel(e.target.value)}
+                className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              >
+                {ACTIVITY_OPTIONS.map((a) => (
+                  <option key={a.value} value={a.value}>{a.label} ({a.desc})</option>
                 ))}
               </select>
             </div>
@@ -152,6 +177,7 @@ export default function SettingsPage() {
             <Row label="Возраст" value={user?.age ? `${user.age} лет` : '—'} />
             <Row label="Рост" value={user?.height ? `${user.height} см` : '—'} />
             <Row label="Цель" value={goalLabel} />
+            <Row label="Активность" value={activityLabel} />
             <Row label="Целевой вес" value={user?.targetWeight ? `${user.targetWeight} кг` : '—'} />
             <div className="px-4 py-3 border-t border-border">
               <button

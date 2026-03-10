@@ -3,14 +3,22 @@
 import { prisma } from '@/lib/db';
 import { getCurrentUserId } from '@/lib/auth';
 
+const ACTIVITY_MULTIPLIERS: Record<string, number> = {
+  sedentary: 1.2,
+  light: 1.375,
+  moderate: 1.55,
+  active: 1.725,
+};
+
 export type CalorieBalance = {
   bmr: number | null;          // СООВ из Picooc
   workoutBurned: number;       // Сожжено за тренировки (формула)
-  dailyNorm: number | null;    // BMR + сожжено (- 500 при похудении)
+  dailyNorm: number | null;    // СООВ × коэффициент активности (- 500 при похудении)
   eaten: number;               // Съедено из записей питания
   remaining: number | null;    // Сколько можно ещё съесть
   deficit: boolean;            // Применён дефицит -500
   goal: string | null;
+  activityLevel: string;
 };
 
 export async function getCalorieBalance(dateStr?: string): Promise<CalorieBalance> {
@@ -29,7 +37,7 @@ export async function getCalorieBalance(dateStr?: string): Promise<CalorieBalanc
     // Профиль пользователя
     prisma.user.findUnique({
       where: { id: userId },
-      select: { goal: true, targetWeight: true },
+      select: { goal: true, targetWeight: true, activityLevel: true },
     }),
     // Приёмы пищи за день
     prisma.meal.findMany({
@@ -59,13 +67,17 @@ export async function getCalorieBalance(dateStr?: string): Promise<CalorieBalanc
   // Съедено
   const eaten = todayMeals.reduce((sum, m) => sum + (m.calories ?? 0), 0);
 
+  // Коэффициент активности
+  const activityLevel = user?.activityLevel || 'moderate';
+  const multiplier = ACTIVITY_MULTIPLIERS[activityLevel] ?? 1.55;
+
   // Дефицит при похудении
   const isLoss = user?.goal === 'loss';
 
-  // Дневная норма = BMR + сожжено (- 500 при цели "похудение")
+  // Дневная норма = СООВ × коэффициент активности + сожжено на тренировке (- 500 при цели "похудение")
   let dailyNorm: number | null = null;
   if (bmr !== null) {
-    dailyNorm = Math.round(bmr + workoutBurned - (isLoss ? 500 : 0));
+    dailyNorm = Math.round(bmr * multiplier + workoutBurned - (isLoss ? 500 : 0));
   }
 
   const remaining = dailyNorm !== null ? dailyNorm - eaten : null;
@@ -78,5 +90,6 @@ export async function getCalorieBalance(dateStr?: string): Promise<CalorieBalanc
     remaining,
     deficit: isLoss,
     goal: user?.goal ?? null,
+    activityLevel,
   };
 }

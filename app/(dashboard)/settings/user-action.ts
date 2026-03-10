@@ -7,7 +7,7 @@ export async function getCurrentUser() {
   const userId = await getCurrentUserId();
   return prisma.user.findUnique({
     where: { id: userId },
-    select: { email: true, name: true, age: true, height: true, goal: true, targetWeight: true },
+    select: { email: true, name: true, age: true, height: true, goal: true, targetWeight: true, activityLevel: true },
   });
 }
 
@@ -17,6 +17,7 @@ export async function updateProfile(data: {
   height?: number | null;
   goal?: string | null;
   targetWeight?: number | null;
+  activityLevel?: string | null;
 }) {
   const userId = await getCurrentUserId();
   await prisma.user.update({
@@ -27,6 +28,7 @@ export async function updateProfile(data: {
       height: data.height ?? null,
       goal: data.goal ?? null,
       targetWeight: data.targetWeight ?? null,
+      activityLevel: data.activityLevel ?? undefined,
     },
   });
   return { success: true };

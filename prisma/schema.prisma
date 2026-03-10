@@ -14,8 +14,9 @@ model User {
   name         String?
   age          Int?
   height       Int?     // cm
-  goal         String?  // loss | gain | maintain
-  targetWeight Float?   @map("target_weight") // kg
+  goal          String?  // loss | gain | maintain
+  targetWeight  Float?   @map("target_weight") // kg
+  activityLevel String?  @default("moderate") @map("activity_level") // sedentary | light | moderate | active
   createdAt    DateTime @default(now()) @map("created_at")
 
   checkIns         CheckIn[]

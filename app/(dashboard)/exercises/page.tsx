@@ -83,12 +83,20 @@ export default function ExercisesPage() {
     <div className="max-w-lg mx-auto p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Упражнения</h1>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium"
-        >
-          {showForm ? 'Отмена' : '+ Добавить'}
-        </button>
+        <div className="flex gap-2">
+          <Link
+            href="/exercises/progress"
+            className="text-accent text-sm font-medium px-4 py-2 rounded-xl hover:bg-accent/10 transition-colors"
+          >
+            Прогресс
+          </Link>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium"
+          >
+            {showForm ? 'Отмена' : '+ Добавить'}
+          </button>
+        </div>
       </div>
 
       {/* Error */}

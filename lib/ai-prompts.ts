@@ -131,6 +131,40 @@ ${dataBlock}
 Будь конкретным и практичным. Не повторяй данные — анализируй тренды. Пиши на русском, кратко (до 300 слов).`;
 }
 
+export function buildMealAnalysisPrompt(description?: string | null): string {
+  let prompt = `Ты — опытный нутрициолог. Проанализируй фото приёма пищи.
+
+Определи:
+1. Какие блюда/продукты на фото
+2. Примерный размер порции
+3. Приблизительный состав на всю порцию:
+   - Калории (ккал)
+   - Белки (г)
+   - Жиры (г)
+   - Углеводы (г)`;
+
+  if (description) {
+    prompt += `\n\nПользователь описал еду: "${description}"`;
+  }
+
+  prompt += `
+
+Ответь строго в формате JSON (без markdown, без \`\`\`):
+{
+  "dishes": "перечисление блюд через запятую",
+  "calories": число,
+  "protein": число,
+  "fat": число,
+  "carbs": число,
+  "comment": "краткий комментарий по питательности (1-2 предложения)"
+}
+
+Если на фото не еда — верни:
+{"error": "На фото не удалось распознать еду"}`;
+
+  return prompt;
+}
+
 export type WeeklyContext = DailyContext;
 
 export function buildWeeklyPrompt(ctx: WeeklyContext): string {

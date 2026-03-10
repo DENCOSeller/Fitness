@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useTransition, useRef } from 'react';
-import { createMeal, getMealsByDate, deleteMeal } from './actions';
+import { createMeal, getMealsByDate, deleteMeal, analyzeMeal } from './actions';
 
 type Meal = {
   id: number;
@@ -54,6 +54,7 @@ export default function MealsPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [isPending, startTransition] = useTransition();
+  const [analyzingId, setAnalyzingId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -139,6 +140,24 @@ export default function MealsPage() {
       }
       await loadMeals();
     });
+  }
+
+  async function handleAnalyze(id: number) {
+    setAnalyzingId(id);
+    setError('');
+    try {
+      const result = await analyzeMeal(id);
+      if (result.error) {
+        setError(result.error);
+        setTimeout(() => setError(''), 5000);
+      }
+      await loadMeals();
+    } catch {
+      setError('Ошибка при анализе');
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setAnalyzingId(null);
+    }
   }
 
   function changeDate(delta: number) {
@@ -354,6 +373,38 @@ export default function MealsPage() {
                     </svg>
                   </button>
                 </div>
+
+                {/* AI Analysis */}
+                {meal.aiAnalysis && (
+                  <div className="mt-3 bg-accent/10 rounded-xl p-3">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <svg className="h-4 w-4 text-accent" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+                      </svg>
+                      <span className="text-xs font-medium text-accent">AI анализ</span>
+                    </div>
+                    {meal.aiAnalysis.split('\n').map((line, i) => (
+                      <p key={i} className={`text-sm ${i === 1 ? 'font-medium text-text' : 'text-text-secondary'}`}>
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {/* Analyze button */}
+                {meal.photoPath && (
+                  <button
+                    onClick={() => handleAnalyze(meal.id)}
+                    disabled={analyzingId === meal.id}
+                    className="mt-3 w-full py-2 rounded-xl text-sm font-medium transition-colors bg-accent/15 text-accent hover:bg-accent/25 disabled:opacity-50"
+                  >
+                    {analyzingId === meal.id
+                      ? 'Анализирую...'
+                      : meal.aiAnalysis
+                        ? 'Повторить анализ AI'
+                        : 'Анализ AI'}
+                  </button>
+                )}
               </div>
             </div>
           ))}

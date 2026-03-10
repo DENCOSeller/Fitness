@@ -37,6 +37,8 @@ Chunk 4 (layout и навигация) — готов.
 Chunk 5 (ежедневный чек-ин) — готов.
 Chunk 6 (библиотека упражнений) — готов.
 Chunk 7 (журнал тренировок) — готов.
+Chunk 8–20 — готовы.
+Chunk 21 (деплой на сервер) — готов.
 
 ## Commands
 
@@ -48,6 +50,20 @@ npx prisma migrate dev    # Миграции (dev)
 npx prisma migrate deploy # Миграции (production)
 npx prisma studio         # Визуальный браузер БД
 ```
+
+## Deploy
+
+```bash
+./server-setup.sh          # Первоначальная настройка сервера (один раз)
+./deploy.sh                # Деплой обновлений
+pm2 status                 # Статус приложения
+pm2 logs denco-health      # Логи
+pm2 restart denco-health   # Рестарт
+```
+
+- **PM2 конфиг**: `ecosystem.config.js`
+- **Nginx конфиг**: `nginx.conf` (копируется в `/etc/nginx/sites-available/`)
+- **Standalone build**: `next.config.ts` → `output: "standalone"`
 
 ## Environment Variables (.env)
 

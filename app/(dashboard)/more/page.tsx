@@ -3,6 +3,7 @@ import Link from "next/link";
 const links = [
   { href: "/exercises", label: "Упражнения", desc: "Библиотека упражнений" },
   { href: "/body", label: "Тело", desc: "Вес, жир, мышцы (Picooc)" },
+  { href: "/progress", label: "Фото прогресса", desc: "Фото тела, сравнение было/стало" },
   { href: "/health", label: "Apple Health", desc: "Шаги, сон, пульс" },
   { href: "/ai", label: "AI-советы", desc: "Рекомендации и отчёты" },
   { href: "/settings", label: "Настройки", desc: "Экспорт и бэкап" },

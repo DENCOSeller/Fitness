@@ -11,6 +11,7 @@ const navItems = [
   { href: "/exercises", label: "Упражнения" },
   { href: "/meals", label: "Питание" },
   { href: "/body", label: "Тело" },
+  { href: "/progress", label: "Фото прогресса" },
   { href: "/health", label: "Apple Health" },
   { href: "/ai", label: "AI-советы" },
   { href: "/settings", label: "Настройки" },

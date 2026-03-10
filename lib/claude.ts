@@ -18,6 +18,52 @@ export async function askClaude(prompt: string, model = 'claude-sonnet-4-6', max
   throw new Error('Unexpected response type from Claude');
 }
 
+export async function askClaudeVisionTwo(
+  prompt: string,
+  image1Base64: string,
+  image2Base64: string,
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' = 'image/jpeg',
+  model = 'claude-sonnet-4-6'
+): Promise<string> {
+  const response = await client.messages.create({
+    model,
+    max_tokens: 1500,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: mediaType,
+              data: image1Base64,
+            },
+          },
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: mediaType,
+              data: image2Base64,
+            },
+          },
+          {
+            type: 'text',
+            text: prompt,
+          },
+        ],
+      },
+    ],
+  });
+
+  const block = response.content[0];
+  if (block.type === 'text') {
+    return block.text;
+  }
+  throw new Error('Unexpected response type from Claude');
+}
+
 export async function askClaudeVision(
   prompt: string,
   imageBase64: string,

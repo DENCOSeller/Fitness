@@ -53,7 +53,7 @@ export async function generateDailyInsight() {
   const [user, checkIns, workouts, body, meals, health] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { name: true, age: true, height: true, goal: true, targetWeight: true },
+      select: { name: true, birthDate: true, height: true, goal: true, targetWeight: true },
     }),
     prisma.checkIn.findMany({
       where: { userId, date: { gte: since } },
@@ -214,7 +214,7 @@ export async function generateWeeklyReport() {
   const [userProfile, checkIns, workouts, body, meals, health] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { name: true, age: true, height: true, goal: true, targetWeight: true },
+      select: { name: true, birthDate: true, height: true, goal: true, targetWeight: true },
     }),
     prisma.checkIn.findMany({
       where: { userId, date: { gte: since } },

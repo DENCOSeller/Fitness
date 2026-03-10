@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { logout, changePassword } from './actions';
 import { getCurrentUser, updateProfile } from './user-action';
+import { calculateAge } from '@/lib/user-helpers';
 
 const GOAL_OPTIONS = [
   { value: 'loss', label: 'Похудение' },
@@ -18,23 +19,38 @@ const ACTIVITY_OPTIONS = [
   { value: 'active', label: 'Высокая активность', desc: '×1.725' },
 ];
 
+const GENDER_OPTIONS = [
+  { value: 'male', label: 'Мужчина' },
+  { value: 'female', label: 'Женщина' },
+];
+
+function formatDateInput(d: Date | string | null): string {
+  if (!d) return '';
+  const date = typeof d === 'string' ? new Date(d) : d;
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const [user, setUser] = useState<{
     email: string;
     name: string | null;
-    age: number | null;
+    gender: string | null;
+    birthDate: string | Date | null;
     height: number | null;
     goal: string | null;
     targetWeight: number | null;
     activityLevel: string | null;
   } | null>(null);
 
-  // Profile edit
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileName, setProfileName] = useState('');
-  const [profileAge, setProfileAge] = useState('');
+  const [profileGender, setProfileGender] = useState('');
+  const [profileBirthDate, setProfileBirthDate] = useState('');
   const [profileHeight, setProfileHeight] = useState('');
   const [profileGoal, setProfileGoal] = useState('');
   const [profileTargetWeight, setProfileTargetWeight] = useState('');
@@ -42,7 +58,6 @@ export default function SettingsPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
 
-  // Password change
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -54,7 +69,8 @@ export default function SettingsPage() {
       if (u) {
         setUser(u);
         setProfileName(u.name || '');
-        setProfileAge(u.age ? String(u.age) : '');
+        setProfileGender(u.gender || '');
+        setProfileBirthDate(formatDateInput(u.birthDate));
         setProfileHeight(u.height ? String(u.height) : '');
         setProfileGoal(u.goal || '');
         setProfileTargetWeight(u.targetWeight ? String(u.targetWeight) : '');
@@ -66,12 +82,12 @@ export default function SettingsPage() {
   const handleSaveProfile = async () => {
     setSavingProfile(true);
     setProfileMsg(null);
-    const age = profileAge ? parseInt(profileAge, 10) : null;
     const height = profileHeight ? parseInt(profileHeight, 10) : null;
     const targetWeight = profileTargetWeight ? parseFloat(profileTargetWeight) : null;
     await updateProfile({
       name: profileName,
-      age: age && age > 0 && age < 150 ? age : null,
+      gender: profileGender || null,
+      birthDate: profileBirthDate || null,
       height: height && height > 50 && height < 300 ? height : null,
       goal: profileGoal || null,
       targetWeight: targetWeight && targetWeight > 20 && targetWeight < 300 ? targetWeight : null,
@@ -80,7 +96,8 @@ export default function SettingsPage() {
     setUser((prev) => prev ? {
       ...prev,
       name: profileName || null,
-      age: age && age > 0 && age < 150 ? age : null,
+      gender: profileGender || null,
+      birthDate: profileBirthDate || null,
       height: height && height > 50 && height < 300 ? height : null,
       goal: profileGoal || null,
       targetWeight: targetWeight && targetWeight > 20 && targetWeight < 300 ? targetWeight : null,
@@ -116,17 +133,35 @@ export default function SettingsPage() {
 
   const goalLabel = GOAL_OPTIONS.find((g) => g.value === user?.goal)?.label || '—';
   const activityLabel = ACTIVITY_OPTIONS.find((a) => a.value === (user?.activityLevel || 'moderate'))?.label || 'Средняя активность';
+  const genderLabel = GENDER_OPTIONS.find((g) => g.value === user?.gender)?.label || '—';
+  const age = calculateAge(user?.birthDate);
 
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Настройки</h1>
 
-      {/* Profile */}
       <Section title="Профиль">
         {editingProfile ? (
           <div className="p-4 space-y-3">
             <FieldInput label="Имя" value={profileName} onChange={setProfileName} placeholder="Как вас зовут?" />
-            <FieldInput label="Возраст" value={profileAge} onChange={setProfileAge} placeholder="Лет" type="number" />
+            <div>
+              <label className="block text-xs text-text-secondary mb-1">Пол</label>
+              <div className="flex gap-2">
+                {GENDER_OPTIONS.map((g) => (
+                  <button
+                    key={g.value}
+                    type="button"
+                    onClick={() => setProfileGender(g.value)}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                      profileGender === g.value ? 'bg-accent text-white' : 'bg-card-hover text-text-secondary border border-border'
+                    }`}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <FieldInput label="Дата рождения" value={profileBirthDate} onChange={setProfileBirthDate} type="date" />
             <FieldInput label="Рост (см)" value={profileHeight} onChange={setProfileHeight} placeholder="См" type="number" />
             <div>
               <label className="block text-xs text-text-secondary mb-1">Цель</label>
@@ -174,7 +209,8 @@ export default function SettingsPage() {
           <>
             <Row label="Email" value={user?.email || '...'} />
             <Row label="Имя" value={user?.name || '—'} />
-            <Row label="Возраст" value={user?.age ? `${user.age} лет` : '—'} />
+            <Row label="Пол" value={genderLabel} />
+            <Row label="Возраст" value={age ? `${age} лет` : '—'} />
             <Row label="Рост" value={user?.height ? `${user.height} см` : '—'} />
             <Row label="Цель" value={goalLabel} />
             <Row label="Активность" value={activityLabel} />
@@ -194,72 +230,28 @@ export default function SettingsPage() {
         )}
       </Section>
 
-      {/* Security */}
       <Section title="Безопасность">
         {showPasswordForm ? (
           <form onSubmit={handleChangePassword} className="p-4 space-y-3">
-            <input
-              type="password"
-              placeholder="Текущий пароль"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              required
-              className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-            <input
-              type="password"
-              placeholder="Новый пароль (мин. 4 символа)"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-              minLength={4}
-              className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-            {passwordMsg?.error && (
-              <p className="text-sm text-danger">{passwordMsg.error}</p>
-            )}
+            <input type="password" placeholder="Текущий пароль" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent" />
+            <input type="password" placeholder="Новый пароль (мин. 4 символа)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={4} className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent" />
+            {passwordMsg?.error && <p className="text-sm text-danger">{passwordMsg.error}</p>}
             <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={changingPassword}
-                className="flex-1 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {changingPassword ? 'Сохранение...' : 'Сменить пароль'}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setShowPasswordForm(false); setPasswordMsg(null); }}
-                className="rounded-xl px-4 py-2.5 text-sm text-text-secondary"
-              >
-                Отмена
-              </button>
+              <button type="submit" disabled={changingPassword} className="flex-1 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">{changingPassword ? 'Сохранение...' : 'Сменить пароль'}</button>
+              <button type="button" onClick={() => { setShowPasswordForm(false); setPasswordMsg(null); }} className="rounded-xl px-4 py-2.5 text-sm text-text-secondary">Отмена</button>
             </div>
           </form>
         ) : (
           <div className="px-4 py-3">
-            <button
-              onClick={() => setShowPasswordForm(true)}
-              className="text-sm text-accent font-medium"
-            >
-              Сменить пароль
-            </button>
-            {passwordMsg?.success && (
-              <p className="text-sm text-success mt-1">Пароль успешно изменён</p>
-            )}
+            <button onClick={() => setShowPasswordForm(true)} className="text-sm text-accent font-medium">Сменить пароль</button>
+            {passwordMsg?.success && <p className="text-sm text-success mt-1">Пароль успешно изменён</p>}
           </div>
         )}
         <div className="border-t border-border">
-          <button
-            onClick={handleLogout}
-            disabled={loggingOut}
-            className="w-full px-4 py-3 text-left text-danger text-sm font-medium disabled:opacity-50"
-          >
-            {loggingOut ? 'Выход...' : 'Выйти из аккаунта'}
-          </button>
+          <button onClick={handleLogout} disabled={loggingOut} className="w-full px-4 py-3 text-left text-danger text-sm font-medium disabled:opacity-50">{loggingOut ? 'Выход...' : 'Выйти из аккаунта'}</button>
         </div>
       </Section>
 
-      {/* App Info */}
       <Section title="О приложении">
         <Row label="Приложение" value="DENCO Health" />
         <Row label="Версия" value="0.1.0" />
@@ -271,29 +263,11 @@ export default function SettingsPage() {
   );
 }
 
-function FieldInput({
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = 'text',
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  type?: string;
-}) {
+function FieldInput({ label, value, onChange, placeholder, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
   return (
     <div>
       <label className="block text-xs text-text-secondary mb-1">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-      />
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm text-text focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent" />
     </div>
   );
 }
@@ -302,9 +276,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div className="mb-6">
       <h2 className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2 px-1">{title}</h2>
-      <div className="rounded-2xl bg-card overflow-hidden">
-        {children}
-      </div>
+      <div className="rounded-2xl bg-card overflow-hidden">{children}</div>
     </div>
   );
 }

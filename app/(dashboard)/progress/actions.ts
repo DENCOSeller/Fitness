@@ -71,7 +71,7 @@ export async function analyzeProgressPhoto(id: number) {
   const userId = await getCurrentUserId();
   const [photo, user] = await Promise.all([
     prisma.progressPhoto.findUnique({ where: { id } }),
-    prisma.user.findUnique({ where: { id: userId }, select: { age: true, height: true, goal: true, targetWeight: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { birthDate: true, height: true, goal: true, targetWeight: true } }),
   ]);
   if (!photo || photo.userId !== userId) {
     return { error: 'Фото не найдено' };
@@ -108,7 +108,7 @@ export async function compareProgressPhotos(id1: number, id2: number) {
   const [photo1, photo2, user] = await Promise.all([
     prisma.progressPhoto.findUnique({ where: { id: id1 } }),
     prisma.progressPhoto.findUnique({ where: { id: id2 } }),
-    prisma.user.findUnique({ where: { id: userId }, select: { age: true, height: true, goal: true, targetWeight: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { birthDate: true, height: true, goal: true, targetWeight: true } }),
   ]);
 
   if (!photo1 || !photo2 || photo1.userId !== userId || photo2.userId !== userId) {

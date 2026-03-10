@@ -40,6 +40,7 @@ interface HealthData {
 export interface UserProfile {
   name?: string | null;
   age?: number | null;
+  birthDate?: Date | string | null;
   height?: number | null;
   goal?: string | null;
   targetWeight?: number | null;
@@ -68,7 +69,8 @@ export function buildDailyPrompt(ctx: DailyContext): string {
   if (ctx.profile) {
     const p = ctx.profile;
     const parts: string[] = [];
-    if (p.age) parts.push(`возраст: ${p.age} лет`);
+    const age = p.age ?? (p.birthDate ? (() => { const bd = typeof p.birthDate === 'string' ? new Date(p.birthDate) : p.birthDate; const today = new Date(); let a = today.getFullYear() - bd.getFullYear(); const m = today.getMonth() - bd.getMonth(); if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) a--; return a > 0 && a < 150 ? a : null; })() : null);
+    if (age) parts.push(`возраст: ${age} лет`);
     if (p.height) parts.push(`рост: ${p.height} см`);
     if (p.goal) parts.push(`цель: ${goalLabels[p.goal] || p.goal}`);
     if (p.targetWeight) parts.push(`целевой вес: ${p.targetWeight} кг`);
@@ -188,10 +190,11 @@ export function buildMealAnalysisPrompt(description?: string | null): string {
   return prompt;
 }
 
-export function buildProgressPhotoPrompt(profile?: { age?: number | null; height?: number | null; goal?: string | null; targetWeight?: number | null }): string {
+export function buildProgressPhotoPrompt(profile?: { age?: number | null; birthDate?: Date | string | null; height?: number | null; goal?: string | null; targetWeight?: number | null }): string {
   const goalLabels: Record<string, string> = { loss: 'похудение', gain: 'набор массы', maintain: 'поддержание формы' };
   const profileLines: string[] = [];
-  if (profile?.age) profileLines.push(`Возраст: ${profile.age} лет`);
+  const photoAge = profile?.age ?? (profile?.birthDate ? (() => { const bd = typeof profile.birthDate === 'string' ? new Date(profile.birthDate) : profile.birthDate; const today = new Date(); let a = today.getFullYear() - bd.getFullYear(); const m = today.getMonth() - bd.getMonth(); if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) a--; return a > 0 && a < 150 ? a : null; })() : null);
+  if (photoAge) profileLines.push(`Возраст: ${photoAge} лет`);
   if (profile?.height) profileLines.push(`Рост: ${profile.height} см`);
   if (profile?.goal) profileLines.push(`Цель: ${goalLabels[profile.goal] || profile.goal}`);
   if (profile?.targetWeight) profileLines.push(`Целевой вес: ${profile.targetWeight} кг`);
@@ -209,10 +212,11 @@ export function buildProgressPhotoPrompt(profile?: { age?: number | null; height
 Если на фото не тело/фигура человека — напиши: "На фото не удалось распознать фигуру для анализа."`;
 }
 
-export function buildProgressComparePrompt(date1: string, date2: string, profile?: { age?: number | null; height?: number | null; goal?: string | null; targetWeight?: number | null }): string {
+export function buildProgressComparePrompt(date1: string, date2: string, profile?: { age?: number | null; birthDate?: Date | string | null; height?: number | null; goal?: string | null; targetWeight?: number | null }): string {
   const goalLabels: Record<string, string> = { loss: 'похудение', gain: 'набор массы', maintain: 'поддержание формы' };
   const profileLines: string[] = [];
-  if (profile?.age) profileLines.push(`Возраст: ${profile.age} лет`);
+  const compareAge = profile?.age ?? (profile?.birthDate ? (() => { const bd = typeof profile.birthDate === 'string' ? new Date(profile.birthDate) : profile.birthDate; const today = new Date(); let a = today.getFullYear() - bd.getFullYear(); const m = today.getMonth() - bd.getMonth(); if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) a--; return a > 0 && a < 150 ? a : null; })() : null);
+  if (compareAge) profileLines.push(`Возраст: ${compareAge} лет`);
   if (profile?.height) profileLines.push(`Рост: ${profile.height} см`);
   if (profile?.goal) profileLines.push(`Цель: ${goalLabels[profile.goal] || profile.goal}`);
   if (profile?.targetWeight) profileLines.push(`Целевой вес: ${profile.targetWeight} кг`);

@@ -34,5 +34,5 @@ export async function registerAction(
   }
 
   await createSession(result.user!.id);
-  redirect("/");
+  redirect("/onboarding");
 }

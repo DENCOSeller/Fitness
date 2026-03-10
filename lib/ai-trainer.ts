@@ -15,7 +15,7 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
   const [user, checkIns, workouts, meals, bodyMetrics, healthDaily] = await Promise.all([
     prisma.user.findUnique({
       where: { id: uid },
-      select: { name: true, age: true, height: true, goal: true, targetWeight: true },
+      select: { name: true, gender: true, birthDate: true, height: true, goal: true, targetWeight: true },
     }),
     prisma.checkIn.findMany({
       where: { userId: uid, date: { gte: thirtyDaysAgo } },
@@ -113,7 +113,15 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
   const goalLabels: Record<string, string> = { loss: 'похудение', gain: 'набор массы', maintain: 'поддержание формы' };
   const profileParts: string[] = [];
   if (user?.name) profileParts.push(`Имя: ${user.name}`);
-  if (user?.age) profileParts.push(`Возраст: ${user.age} лет`);
+  if (user?.gender) profileParts.push(`Пол: ${user.gender === 'female' ? 'женщина' : 'мужчина'}`);
+  if (user?.birthDate) {
+    const bd = new Date(user.birthDate);
+    const today = new Date();
+    let userAge = today.getFullYear() - bd.getFullYear();
+    const m = today.getMonth() - bd.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) userAge--;
+    if (userAge > 0 && userAge < 150) profileParts.push(`Возраст: ${userAge} лет`);
+  }
   if (user?.height) profileParts.push(`Рост: ${user.height} см`);
   if (user?.goal) profileParts.push(`Цель: ${goalLabels[user.goal] || user.goal}`);
   if (user?.targetWeight) profileParts.push(`Целевой вес: ${user.targetWeight} кг`);

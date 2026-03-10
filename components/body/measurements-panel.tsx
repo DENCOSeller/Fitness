@@ -6,11 +6,25 @@ import {
   saveMeasurement,
   getMeasurements,
   deleteMeasurement,
+} from '@/app/(dashboard)/body/measurements-actions';
+import {
   ALL_ZONES,
   ZONE_LABELS,
   type MeasurementZone,
   type MeasurementRecord,
-} from '@/app/(dashboard)/body/measurements-actions';
+} from '@/lib/measurement-types';
+
+const ZONE_TIPS: Record<MeasurementZone, string> = {
+  neck: 'Измеряй посередине шеи, лента горизонтально',
+  chest: 'На уровне сосков, руки опущены, на выдохе',
+  shoulder: 'Бицепс в напряжённом состоянии, в самом широком месте',
+  waist: 'На выдохе, в самом узком месте выше пупка',
+  belly: 'На уровне пупка, расслабленный живот',
+  hips: 'Самая широкая часть бёдер, ноги вместе',
+  glutes: 'Самая выступающая точка ягодиц',
+  thigh: 'В самом широком месте бедра, стоя',
+  calf: 'В самом широком месте икры',
+};
 
 function formatDate(date: Date): string {
   const y = date.getFullYear();
@@ -151,6 +165,9 @@ export default function MeasurementsPanel() {
                 </svg>
               </button>
             </div>
+            <p className="text-xs text-[#8E8E93] bg-[#1C1C1E] rounded-lg px-3 py-2">
+              {ZONE_TIPS[activeZone]}
+            </p>
 
             <div className="flex items-center gap-2">
               <input

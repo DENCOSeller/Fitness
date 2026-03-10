@@ -39,11 +39,13 @@ interface HealthData {
 
 export interface UserProfile {
   name?: string | null;
+  gender?: string | null;
   age?: number | null;
   birthDate?: Date | string | null;
   height?: number | null;
   goal?: string | null;
   targetWeight?: number | null;
+  activityLevel?: string | null;
 }
 
 export interface DailyContext {
@@ -53,6 +55,7 @@ export interface DailyContext {
   meals: MealData[];
   health: HealthData[];
   profile?: UserProfile;
+  profileBlock?: string;
 }
 
 export function buildDailyPrompt(ctx: DailyContext): string {
@@ -64,19 +67,9 @@ export function buildDailyPrompt(ctx: DailyContext): string {
 
   const sections: string[] = [];
 
-  // User profile
-  const goalLabels: Record<string, string> = { loss: 'похудение', gain: 'набор массы', maintain: 'поддержание формы' };
-  if (ctx.profile) {
-    const p = ctx.profile;
-    const parts: string[] = [];
-    const age = p.age ?? (p.birthDate ? (() => { const bd = typeof p.birthDate === 'string' ? new Date(p.birthDate) : p.birthDate; const today = new Date(); let a = today.getFullYear() - bd.getFullYear(); const m = today.getMonth() - bd.getMonth(); if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) a--; return a > 0 && a < 150 ? a : null; })() : null);
-    if (age) parts.push(`возраст: ${age} лет`);
-    if (p.height) parts.push(`рост: ${p.height} см`);
-    if (p.goal) parts.push(`цель: ${goalLabels[p.goal] || p.goal}`);
-    if (p.targetWeight) parts.push(`целевой вес: ${p.targetWeight} кг`);
-    if (parts.length > 0) {
-      sections.push(`Профиль пользователя: ${parts.join(', ')}`);
-    }
+  // User profile (full context block passed from caller)
+  if (ctx.profileBlock) {
+    sections.push(ctx.profileBlock);
   }
 
   // Check-ins
@@ -190,39 +183,27 @@ export function buildMealAnalysisPrompt(description?: string | null): string {
   return prompt;
 }
 
-export function buildProgressPhotoPrompt(profile?: { age?: number | null; birthDate?: Date | string | null; height?: number | null; goal?: string | null; targetWeight?: number | null }): string {
+export function buildProgressPhotoPrompt(contextBlock?: string, goal?: string | null): string {
   const goalLabels: Record<string, string> = { loss: 'похудение', gain: 'набор массы', maintain: 'поддержание формы' };
-  const profileLines: string[] = [];
-  const photoAge = profile?.age ?? (profile?.birthDate ? (() => { const bd = typeof profile.birthDate === 'string' ? new Date(profile.birthDate) : profile.birthDate; const today = new Date(); let a = today.getFullYear() - bd.getFullYear(); const m = today.getMonth() - bd.getMonth(); if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) a--; return a > 0 && a < 150 ? a : null; })() : null);
-  if (photoAge) profileLines.push(`Возраст: ${photoAge} лет`);
-  if (profile?.height) profileLines.push(`Рост: ${profile.height} см`);
-  if (profile?.goal) profileLines.push(`Цель: ${goalLabels[profile.goal] || profile.goal}`);
-  if (profile?.targetWeight) profileLines.push(`Целевой вес: ${profile.targetWeight} кг`);
-  const profileBlock = profileLines.length > 0 ? `\n\nДанные пользователя:\n${profileLines.join('\n')}` : '';
+  const profileSection = contextBlock ? `\n\nДанные пользователя:\n${contextBlock}` : '';
 
-  return `Ты — опытный фитнес-тренер и эксперт по телосложению. Проанализируй фото прогресса тела.${profileBlock}
+  return `Ты — опытный фитнес-тренер и эксперт по телосложению. Проанализируй фото прогресса тела.${profileSection}
 
 Оцени:
 1. **Общее впечатление** — телосложение, пропорции, видимый тонус мышц
 2. **Сильные стороны** — какие группы мышц выглядят хорошо развитыми
 3. **Зоны для улучшения** — над чем стоит поработать
-4. **Рекомендации** — конкретные советы по тренировкам и питанию для улучшения формы${profile?.goal ? ` (с учётом цели: ${goalLabels[profile.goal] || profile.goal})` : ''}
+4. **Рекомендации** — конкретные советы по тренировкам и питанию для улучшения формы${goal ? ` (с учётом цели: ${goalLabels[goal] || goal})` : ''}
 
 Будь честным, но мотивирующим. Пиши на русском, кратко (до 200 слов).
 Если на фото не тело/фигура человека — напиши: "На фото не удалось распознать фигуру для анализа."`;
 }
 
-export function buildProgressComparePrompt(date1: string, date2: string, profile?: { age?: number | null; birthDate?: Date | string | null; height?: number | null; goal?: string | null; targetWeight?: number | null }): string {
+export function buildProgressComparePrompt(date1: string, date2: string, contextBlock?: string, goal?: string | null): string {
   const goalLabels: Record<string, string> = { loss: 'похудение', gain: 'набор массы', maintain: 'поддержание формы' };
-  const profileLines: string[] = [];
-  const compareAge = profile?.age ?? (profile?.birthDate ? (() => { const bd = typeof profile.birthDate === 'string' ? new Date(profile.birthDate) : profile.birthDate; const today = new Date(); let a = today.getFullYear() - bd.getFullYear(); const m = today.getMonth() - bd.getMonth(); if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) a--; return a > 0 && a < 150 ? a : null; })() : null);
-  if (compareAge) profileLines.push(`Возраст: ${compareAge} лет`);
-  if (profile?.height) profileLines.push(`Рост: ${profile.height} см`);
-  if (profile?.goal) profileLines.push(`Цель: ${goalLabels[profile.goal] || profile.goal}`);
-  if (profile?.targetWeight) profileLines.push(`Целевой вес: ${profile.targetWeight} кг`);
-  const profileBlock = profileLines.length > 0 ? `\n\nДанные пользователя:\n${profileLines.join('\n')}` : '';
+  const profileSection = contextBlock ? `\n\nДанные пользователя:\n${contextBlock}` : '';
 
-  return `Ты — опытный фитнес-тренер. Перед тобой два фото прогресса тела одного человека.${profileBlock}
+  return `Ты — опытный фитнес-тренер. Перед тобой два фото прогресса тела одного человека.${profileSection}
 
 Первое фото — от ${date1}.
 Второе фото — от ${date2}.
@@ -230,7 +211,7 @@ export function buildProgressComparePrompt(date1: string, date2: string, profile
 Сравни два фото и оцени:
 1. **Видимые изменения** — что изменилось между фото (объём мышц, рельеф, жировая прослойка, пропорции)
 2. **Прогресс** — есть ли положительная динамика, в каких зонах
-3. **Рекомендации** — что делать дальше для продолжения прогресса${profile?.goal ? ` (с учётом цели: ${goalLabels[profile.goal] || profile.goal})` : ''}
+3. **Рекомендации** — что делать дальше для продолжения прогресса${goal ? ` (с учётом цели: ${goalLabels[goal] || goal})` : ''}
 
 Будь конкретным, укажи на реальные визуальные различия. Если различий мало — скажи честно. Пиши на русском, кратко (до 250 слов).
 Если на фото не тело/фигура — напиши: "На фото не удалось распознать фигуру для сравнения."`;
@@ -253,6 +234,11 @@ export function buildWeeklyPrompt(ctx: WeeklyContext): string {
   });
 
   const sections: string[] = [];
+
+  // User profile (full context block passed from caller)
+  if (ctx.profileBlock) {
+    sections.push(ctx.profileBlock);
+  }
 
   // Check-ins
   if (ctx.checkIns.length > 0) {

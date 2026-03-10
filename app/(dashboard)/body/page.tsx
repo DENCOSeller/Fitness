@@ -29,6 +29,7 @@ type ParsedData = {
   leanMass: number | null;
   bmr: number | null;
   metabolicAge: number | null;
+  comment?: string | null;
 };
 
 function formatDate(date: Date): string {
@@ -323,6 +324,11 @@ export default function BodyPage() {
                     </div>
                   ))}
                 </div>
+                {parsedData.comment && (
+                  <div className="p-3 rounded-xl bg-accent/10 border border-accent/20">
+                    <p className="text-sm text-text">{parsedData.comment}</p>
+                  </div>
+                )}
                 <div className="flex gap-3">
                   <button
                     onClick={handleSave}

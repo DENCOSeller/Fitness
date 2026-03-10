@@ -3,9 +3,10 @@
 import { prisma } from '@/lib/db';
 import { getCurrentUserId } from '@/lib/auth';
 import { askClaudeVision } from '@/lib/claude';
-import { PICOOC_PARSE_PROMPT, validatePicoocData } from '@/lib/picooc-prompt';
+import { buildPicoocPrompt, validatePicoocData } from '@/lib/picooc-prompt';
 import type { PicoocData } from '@/lib/picooc-prompt';
 import { deleteImage } from '@/lib/upload';
+import { buildFullContextBlock } from '@/lib/ai-context';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -15,8 +16,22 @@ export async function parseScreenshot(imageBase64: string, mediaType: string): P
   error?: string;
 }> {
   try {
+    const userId = await getCurrentUserId();
+    const [user, latestMeasurement] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, gender: true, birthDate: true, height: true, goal: true, targetWeight: true, activityLevel: true },
+      }),
+      prisma.bodyMeasurement.findFirst({
+        where: { userId },
+        orderBy: { date: 'desc' },
+      }),
+    ]);
+    const profileContext = buildFullContextBlock(user, null, latestMeasurement);
+    const prompt = buildPicoocPrompt(profileContext || undefined);
+
     const response = await askClaudeVision(
-      PICOOC_PARSE_PROMPT,
+      prompt,
       imageBase64,
       mediaType as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
     );

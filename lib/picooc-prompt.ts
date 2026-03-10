@@ -1,5 +1,7 @@
-export const PICOOC_PARSE_PROMPT = `Ты анализируешь скриншот из приложения Picooc (умные весы для анализа состава тела).
-Скриншот на русском языке.
+export function buildPicoocPrompt(profileContext?: string): string {
+  const profileBlock = profileContext ? `\n\n${profileContext}\n` : '';
+  return `Ты анализируешь скриншот из приложения Picooc (умные весы для анализа состава тела).
+Скриншот на русском языке.${profileBlock}
 
 Извлеки следующие метрики тела со скриншота. Верни ТОЛЬКО валидный JSON-объект с этими полями:
 
@@ -11,7 +13,8 @@ export const PICOOC_PARSE_PROMPT = `Ты анализируешь скриншо
   "leanMass": <число в кг, безжировая масса тела, например 62.1>,
   "bmr": <число в ккал, основной обмен веществ / СООВ, например 1650>,
   "bmi": <число, индекс массы тела, например 23.1>,
-  "metabolicAge": <число, метаболический возраст, например 28>
+  "metabolicAge": <число, метаболический возраст, например 28>,
+  "comment": "<краткий комментарий: оценка показателей с учётом профиля пользователя, 1-2 предложения>"
 }
 
 Правила:
@@ -22,7 +25,12 @@ export const PICOOC_PARSE_PROMPT = `Ты анализируешь скриншо
 - Используй десятичные числа (не строки)
 - Поле "muscleMass" — это процент мышечной массы (%), не килограммы
 - Поле "leanMass" — это безжировая масса в килограммах
-- Поле "bmr" — это основной обмен веществ (СООВ) в ккал`;
+- Поле "bmr" — это основной обмен веществ (СООВ) в ккал
+- В "comment" дай краткую оценку показателей с учётом данных пользователя (пол, возраст, цель)`;
+}
+
+// Keep for backward compatibility
+export const PICOOC_PARSE_PROMPT = buildPicoocPrompt();
 
 export interface PicoocData {
   weight: number | null;
@@ -33,6 +41,7 @@ export interface PicoocData {
   leanMass: number | null;
   bmr: number | null;
   metabolicAge: number | null;
+  comment?: string | null;
 }
 
 export function validatePicoocData(data: PicoocData): string[] {

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentUserId } from '@/lib/auth';
 import { askClaude } from '@/lib/claude';
 import { buildDailyPrompt, buildWeeklyPrompt, type DailyContext, type WeeklyContext } from '@/lib/ai-prompts';
+import { buildFullContextBlock } from '@/lib/ai-context';
 
 export async function getDailyInsight() {
   const userId = await getCurrentUserId();
@@ -50,10 +51,10 @@ export async function generateDailyInsight() {
   since.setDate(since.getDate() - 7);
   since.setHours(0, 0, 0, 0);
 
-  const [user, checkIns, workouts, body, meals, health] = await Promise.all([
+  const [user, checkIns, workouts, body, meals, health, latestPicooc, latestMeasurement] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { name: true, birthDate: true, height: true, goal: true, targetWeight: true },
+      select: { name: true, gender: true, birthDate: true, height: true, goal: true, targetWeight: true, activityLevel: true },
     }),
     prisma.checkIn.findMany({
       where: { userId, date: { gte: since } },
@@ -80,10 +81,19 @@ export async function generateDailyInsight() {
       where: { userId, date: { gte: since } },
       orderBy: { date: 'desc' },
     }),
+    prisma.bodyMetric.findFirst({
+      where: { userId },
+      orderBy: { date: 'desc' },
+    }),
+    prisma.bodyMeasurement.findFirst({
+      where: { userId },
+      orderBy: { date: 'desc' },
+    }),
   ]);
 
   const ctx: DailyContext = {
     profile: user || undefined,
+    profileBlock: buildFullContextBlock(user, latestPicooc, latestMeasurement),
     checkIns: checkIns.map((c) => ({
       date: c.date,
       wellbeing: c.wellbeing,
@@ -211,10 +221,10 @@ export async function generateWeeklyReport() {
   since.setDate(since.getDate() - 7);
   since.setHours(0, 0, 0, 0);
 
-  const [userProfile, checkIns, workouts, body, meals, health] = await Promise.all([
+  const [userProfile, checkIns, workouts, body, meals, health, latestPicoocW, latestMeasurementW] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { name: true, birthDate: true, height: true, goal: true, targetWeight: true },
+      select: { name: true, gender: true, birthDate: true, height: true, goal: true, targetWeight: true, activityLevel: true },
     }),
     prisma.checkIn.findMany({
       where: { userId, date: { gte: since } },
@@ -241,10 +251,19 @@ export async function generateWeeklyReport() {
       where: { userId, date: { gte: since } },
       orderBy: { date: 'asc' },
     }),
+    prisma.bodyMetric.findFirst({
+      where: { userId },
+      orderBy: { date: 'desc' },
+    }),
+    prisma.bodyMeasurement.findFirst({
+      where: { userId },
+      orderBy: { date: 'desc' },
+    }),
   ]);
 
   const ctx: WeeklyContext = {
     profile: userProfile || undefined,
+    profileBlock: buildFullContextBlock(userProfile, latestPicoocW, latestMeasurementW),
     checkIns: checkIns.map((c) => ({
       date: c.date,
       wellbeing: c.wellbeing,

@@ -5,6 +5,7 @@ import { getCurrentUserId } from '@/lib/auth';
 import { deleteImage } from '@/lib/upload';
 import { askClaudeVision, askClaudeVisionTwo } from '@/lib/claude';
 import { buildProgressPhotoPrompt, buildProgressComparePrompt } from '@/lib/ai-prompts';
+import { buildFullContextBlock } from '@/lib/ai-context';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -69,9 +70,11 @@ export async function deleteProgressPhoto(id: number) {
 
 export async function analyzeProgressPhoto(id: number) {
   const userId = await getCurrentUserId();
-  const [photo, user] = await Promise.all([
+  const [photo, user, latestPicooc, latestMeasurement] = await Promise.all([
     prisma.progressPhoto.findUnique({ where: { id } }),
-    prisma.user.findUnique({ where: { id: userId }, select: { birthDate: true, height: true, goal: true, targetWeight: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true, gender: true, birthDate: true, height: true, goal: true, targetWeight: true, activityLevel: true } }),
+    prisma.bodyMetric.findFirst({ where: { userId }, orderBy: { date: 'desc' } }),
+    prisma.bodyMeasurement.findFirst({ where: { userId }, orderBy: { date: 'desc' } }),
   ]);
   if (!photo || photo.userId !== userId) {
     return { error: 'Фото не найдено' };
@@ -86,7 +89,8 @@ export async function analyzeProgressPhoto(id: number) {
   }
 
   const imageBase64 = imageBuffer.toString('base64');
-  const prompt = buildProgressPhotoPrompt(user || undefined);
+  const contextBlock = buildFullContextBlock(user, latestPicooc, latestMeasurement);
+  const prompt = buildProgressPhotoPrompt(contextBlock || undefined, user?.goal);
 
   try {
     const result = await askClaudeVision(prompt, imageBase64, 'image/jpeg');
@@ -105,10 +109,12 @@ export async function analyzeProgressPhoto(id: number) {
 
 export async function compareProgressPhotos(id1: number, id2: number) {
   const userId = await getCurrentUserId();
-  const [photo1, photo2, user] = await Promise.all([
+  const [photo1, photo2, user, latestPicoocC, latestMeasurementC] = await Promise.all([
     prisma.progressPhoto.findUnique({ where: { id: id1 } }),
     prisma.progressPhoto.findUnique({ where: { id: id2 } }),
-    prisma.user.findUnique({ where: { id: userId }, select: { birthDate: true, height: true, goal: true, targetWeight: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true, gender: true, birthDate: true, height: true, goal: true, targetWeight: true, activityLevel: true } }),
+    prisma.bodyMetric.findFirst({ where: { userId }, orderBy: { date: 'desc' } }),
+    prisma.bodyMeasurement.findFirst({ where: { userId }, orderBy: { date: 'desc' } }),
   ]);
 
   if (!photo1 || !photo2 || photo1.userId !== userId || photo2.userId !== userId) {
@@ -131,7 +137,8 @@ export async function compareProgressPhotos(id1: number, id2: number) {
     day: 'numeric', month: 'long', year: 'numeric',
   });
 
-  const prompt = buildProgressComparePrompt(date1, date2, user || undefined);
+  const compareContext = buildFullContextBlock(user, latestPicoocC, latestMeasurementC);
+  const prompt = buildProgressComparePrompt(date1, date2, compareContext || undefined, user?.goal);
 
   try {
     const result = await askClaudeVisionTwo(

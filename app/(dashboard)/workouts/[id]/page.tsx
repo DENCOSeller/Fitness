@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { getWorkout, deleteWorkout } from '../actions';
+import { createTemplateFromWorkout } from '../templates/actions';
 
 interface WorkoutDetail {
   id: number;
@@ -26,6 +27,9 @@ export default function WorkoutDetailPage({ params }: { params: Promise<{ id: st
   const [error, setError] = useState('');
   const [isPending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showTemplateForm, setShowTemplateForm] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateMsg, setTemplateMsg] = useState('');
 
   useEffect(() => {
     getWorkout(parseInt(id)).then((result) => {
@@ -149,6 +153,66 @@ export default function WorkoutDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       ))}
+
+      {!showTemplateForm ? (
+        <button
+          onClick={() => {
+            setTemplateName(workout.type);
+            setShowTemplateForm(true);
+          }}
+          className="w-full bg-card hover:bg-card-hover border border-border border-dashed rounded-2xl py-3 text-accent text-sm transition-colors"
+        >
+          Сохранить как шаблон
+        </button>
+      ) : (
+        <div className="bg-card rounded-2xl p-4 space-y-3">
+          <label className="text-text-secondary text-sm block">Название шаблона</label>
+          <input
+            type="text"
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+            placeholder="Например: Грудь + трицепс"
+            className="w-full bg-bg border border-border rounded-xl px-4 py-2.5 text-sm text-text placeholder:text-text-secondary focus:border-accent outline-none"
+            autoFocus
+          />
+          {templateMsg && (
+            <p className={`text-sm ${templateMsg.includes('!') ? 'text-green-500' : 'text-danger'}`}>
+              {templateMsg}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                startTransition(async () => {
+                  const result = await createTemplateFromWorkout(parseInt(id), templateName);
+                  if (result.error) {
+                    setTemplateMsg(result.error);
+                  } else {
+                    setTemplateMsg('Шаблон сохранён!');
+                    setTimeout(() => {
+                      setShowTemplateForm(false);
+                      setTemplateMsg('');
+                    }, 1500);
+                  }
+                });
+              }}
+              disabled={isPending}
+              className="flex-1 bg-accent text-white text-sm font-medium py-2 rounded-xl hover:bg-accent/90 transition-colors disabled:opacity-50"
+            >
+              {isPending ? '...' : 'Сохранить'}
+            </button>
+            <button
+              onClick={() => {
+                setShowTemplateForm(false);
+                setTemplateMsg('');
+              }}
+              className="text-text-secondary text-sm px-4 py-2 hover:text-text"
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

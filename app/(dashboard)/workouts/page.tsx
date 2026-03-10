@@ -51,12 +51,20 @@ export default function WorkoutsPage() {
     <div className="max-w-lg mx-auto p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-text">Тренировки</h1>
-        <Link
-          href="/workouts/new"
-          className="bg-accent text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-accent/90 transition-colors"
-        >
-          + Новая
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/workouts/templates"
+            className="text-accent text-sm font-medium px-4 py-2 rounded-xl hover:bg-accent/10 transition-colors"
+          >
+            Шаблоны
+          </Link>
+          <Link
+            href="/workouts/new"
+            className="bg-accent text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-accent/90 transition-colors"
+          >
+            + Новая
+          </Link>
+        </div>
       </div>
 
       {loading && (

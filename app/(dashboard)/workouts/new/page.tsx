@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
+import { Suspense, useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { createWorkout, createExerciseFromWorkout } from '../actions';
 import { getExercises } from '../../exercises/actions';
+import { getTemplate } from '../templates/actions';
 import SetInput from '@/components/workout/set-input';
 import ExercisePicker from '@/components/workout/exercise-picker';
 import RestTimer from '@/components/workout/rest-timer';
@@ -22,7 +24,16 @@ interface WorkoutExercise {
 const workoutTypes = ['Силовая', 'Кардио', 'Растяжка', 'Своё'];
 
 export default function NewWorkoutPage() {
+  return (
+    <Suspense fallback={<div className="max-w-lg mx-auto p-4 text-text-secondary text-sm text-center py-8">Загрузка...</div>}>
+      <NewWorkoutContent />
+    </Suspense>
+  );
+}
+
+function NewWorkoutContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
   const [type, setType] = useState('Силовая');
@@ -34,10 +45,32 @@ export default function NewWorkoutPage() {
   const [allExercises, setAllExercises] = useState<Exercise[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
+  const [templateLoaded, setTemplateLoaded] = useState(false);
 
   useEffect(() => {
     getExercises().then(setAllExercises);
   }, []);
+
+  useEffect(() => {
+    const templateId = searchParams.get('template');
+    if (templateId && !templateLoaded) {
+      setTemplateLoaded(true);
+      getTemplate(parseInt(templateId)).then((result) => {
+        if (result.template) {
+          const t = result.template;
+          setWorkoutExercises(
+            t.exercises.map((te) => ({
+              exercise: te.exercise,
+              sets: Array.from({ length: te.sets }, () => ({
+                reps: te.reps,
+                weight: te.weight,
+              })),
+            }))
+          );
+        }
+      });
+    }
+  }, [searchParams, templateLoaded]);
 
   const handleSelectExercise = (exercise: Exercise) => {
     setWorkoutExercises((prev) => [

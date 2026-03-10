@@ -66,6 +66,7 @@ model Exercise {
   equipment    String?
   difficulty   String?  // beginner | intermediate | advanced
   tips         String?
+  type         String   @default("strength") // strength | cardio | flexibility
   isSystem     Boolean  @default(false) @map("is_system")
   createdAt    DateTime @default(now()) @map("created_at")
 
@@ -96,8 +97,13 @@ model WorkoutSet {
   workoutId  Int      @map("workout_id")
   exerciseId Int      @map("exercise_id")
   setOrder   Int      @map("set_order")
-  reps       Int
-  weight     Float
+  reps       Int      @default(0)
+  weight     Float    @default(0)
+  duration   Int?     // minutes (cardio)
+  distance   Float?   // km (cardio)
+  speed      Float?   // km/h (cardio)
+  incline    Float?   // % (cardio)
+  heartRate  Int?     @map("heart_rate") // bpm (cardio)
   createdAt  DateTime @default(now()) @map("created_at")
 
   workout  Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)

@@ -44,7 +44,12 @@ export async function createExercise(data: { name: string; muscleGroup: string }
   }
 
   await prisma.exercise.create({
-    data: { userId, name, muscleGroup },
+    data: {
+      userId,
+      name,
+      muscleGroup,
+      type: muscleGroup === 'Кардио' ? 'cardio' : muscleGroup === 'Растяжка' ? 'flexibility' : 'strength',
+    },
   });
 
   return { success: true };

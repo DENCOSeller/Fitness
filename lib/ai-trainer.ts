@@ -78,7 +78,18 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
       const exercises = w.sets.reduce((acc, s) => {
         const name = s.exercise.name;
         if (!acc[name]) acc[name] = [];
-        acc[name].push(`${s.reps}×${s.weight}кг`);
+        const isCardio = s.exercise.type === 'cardio' || s.exercise.muscleGroup === 'Кардио' || s.duration != null;
+        if (isCardio) {
+          const parts: string[] = [];
+          if (s.duration) parts.push(`${s.duration} мин`);
+          if (s.distance) parts.push(`${s.distance} км`);
+          if (s.speed) parts.push(`${s.speed} км/ч`);
+          if (s.incline) parts.push(`наклон ${s.incline}%`);
+          if (s.heartRate) parts.push(`пульс ${s.heartRate}`);
+          acc[name].push(parts.join(', ') || 'кардио');
+        } else {
+          acc[name].push(`${s.reps}×${s.weight}кг`);
+        }
         return acc;
       }, {} as Record<string, string[]>);
       const exerciseStr = Object.entries(exercises)

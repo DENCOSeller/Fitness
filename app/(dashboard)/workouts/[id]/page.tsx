@@ -5,19 +5,30 @@ import { useRouter } from 'next/navigation';
 import { getWorkout, deleteWorkout } from '../actions';
 import { createTemplateFromWorkout } from '../templates/actions';
 
+interface WorkoutSet {
+  id: number;
+  setOrder: number;
+  reps: number;
+  weight: number;
+  duration: number | null;
+  distance: number | null;
+  speed: number | null;
+  incline: number | null;
+  heartRate: number | null;
+  exercise: { id: number; name: string; muscleGroup: string; type?: string };
+}
+
 interface WorkoutDetail {
   id: number;
   date: string | Date;
   type: string;
   durationMin: number | null;
   note: string | null;
-  sets: {
-    id: number;
-    setOrder: number;
-    reps: number;
-    weight: number;
-    exercise: { id: number; name: string; muscleGroup: string };
-  }[];
+  sets: WorkoutSet[];
+}
+
+function isCardioSet(set: WorkoutSet): boolean {
+  return set.exercise.type === 'cardio' || set.exercise.muscleGroup === 'Кардио' || set.duration != null;
 }
 
 export default function WorkoutDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -46,8 +57,8 @@ export default function WorkoutDetailPage({ params }: { params: Promise<{ id: st
     return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
-  const groupByExercise = (sets: WorkoutDetail['sets']) => {
-    const groups: { exercise: { id: number; name: string; muscleGroup: string }; sets: { reps: number; weight: number }[] }[] = [];
+  const groupByExercise = (sets: WorkoutSet[]) => {
+    const groups: { exercise: WorkoutSet['exercise']; sets: WorkoutSet[] }[] = [];
     let currentExId = -1;
 
     for (const set of sets) {
@@ -55,7 +66,7 @@ export default function WorkoutDetailPage({ params }: { params: Promise<{ id: st
         groups.push({ exercise: set.exercise, sets: [] });
         currentExId = set.exercise.id;
       }
-      groups[groups.length - 1].sets.push({ reps: set.reps, weight: set.weight });
+      groups[groups.length - 1].sets.push(set);
     }
 
     return groups;
@@ -91,7 +102,8 @@ export default function WorkoutDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const groups = groupByExercise(workout.sets);
-  const totalVolume = workout.sets.reduce((sum, s) => sum + s.reps * s.weight, 0);
+  const strengthSets = workout.sets.filter(s => !isCardioSet(s));
+  const totalVolume = strengthSets.reduce((sum, s) => sum + s.reps * s.weight, 0);
 
   return (
     <div className="max-w-lg mx-auto p-4 space-y-4">
@@ -134,25 +146,52 @@ export default function WorkoutDetailPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
-      {groups.map((group, idx) => (
-        <div key={idx} className="bg-card rounded-2xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-text font-medium text-sm">{group.exercise.name}</span>
-            <span className="text-text-secondary text-xs">{group.exercise.muscleGroup}</span>
-          </div>
+      {groups.map((group, idx) => {
+        const isCardio = isCardioSet(group.sets[0]);
 
-          <div className="space-y-1.5">
-            {group.sets.map((set, setIdx) => (
-              <div key={setIdx} className="flex items-center gap-3 text-sm">
-                <span className="text-text-secondary w-6 text-center text-xs">{setIdx + 1}</span>
-                <span className="text-text">{set.reps} повт.</span>
-                <span className="text-text-secondary">×</span>
-                <span className="text-text">{set.weight} кг</span>
+        return (
+          <div key={idx} className="bg-card rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-text font-medium text-sm">{group.exercise.name}</span>
+              <span className="text-text-secondary text-xs">{group.exercise.muscleGroup}</span>
+            </div>
+
+            {isCardio ? (
+              <div className="space-y-1.5">
+                {group.sets.map((set, setIdx) => {
+                  const parts: string[] = [];
+                  if (set.duration) parts.push(`${set.duration} мин`);
+                  if (set.distance) parts.push(`${set.distance} км`);
+                  if (set.speed) parts.push(`${set.speed} км/ч`);
+                  if (set.incline) parts.push(`наклон ${set.incline}%`);
+                  if (set.heartRate) parts.push(`пульс ${set.heartRate}`);
+
+                  return (
+                    <div key={setIdx} className="flex flex-wrap gap-2 text-sm">
+                      {parts.map((part, i) => (
+                        <span key={i} className="bg-bg text-text px-2 py-0.5 rounded-md text-xs">
+                          {part}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            ) : (
+              <div className="space-y-1.5">
+                {group.sets.map((set, setIdx) => (
+                  <div key={setIdx} className="flex items-center gap-3 text-sm">
+                    <span className="text-text-secondary w-6 text-center text-xs">{setIdx + 1}</span>
+                    <span className="text-text">{set.reps} повт.</span>
+                    <span className="text-text-secondary">×</span>
+                    <span className="text-text">{set.weight} кг</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {!showTemplateForm ? (
         <button

@@ -23,6 +23,8 @@ export async function getExerciseProgress(id: number) {
     return { error: 'Упражнение не найдено' };
   }
 
+  const isCardio = exercise.type === 'cardio' || exercise.muscleGroup === 'Кардио';
+
   // Group sets by workout (only user's workouts)
   const workoutMap = new Map<
     number,
@@ -30,7 +32,7 @@ export async function getExerciseProgress(id: number) {
       workoutId: number;
       date: string;
       workoutType: string;
-      sets: { setOrder: number; reps: number; weight: number }[];
+      sets: { setOrder: number; reps: number; weight: number; duration: number | null; distance: number | null; speed: number | null; incline: number | null; heartRate: number | null }[];
     }
   >();
 
@@ -49,21 +51,32 @@ export async function getExerciseProgress(id: number) {
       setOrder: set.setOrder,
       reps: set.reps,
       weight: Number(set.weight),
+      duration: set.duration,
+      distance: set.distance ? Number(set.distance) : null,
+      speed: set.speed ? Number(set.speed) : null,
+      incline: set.incline ? Number(set.incline) : null,
+      heartRate: set.heartRate,
     });
   }
 
   // Sort sets within each workout and calculate aggregates
   const history = Array.from(workoutMap.values()).map((entry) => {
     entry.sets.sort((a, b) => a.setOrder - b.setOrder);
+    if (isCardio) {
+      const totalDuration = entry.sets.reduce((sum, s) => sum + (s.duration || 0), 0);
+      const totalDistance = entry.sets.reduce((sum, s) => sum + (s.distance || 0), 0);
+      return { ...entry, maxWeight: 0, totalVolume: 0, totalDuration, totalDistance };
+    }
     const maxWeight = Math.max(...entry.sets.map((s) => s.weight));
     const totalVolume = entry.sets.reduce((sum, s) => sum + s.reps * s.weight, 0);
-    return { ...entry, maxWeight, totalVolume };
+    return { ...entry, maxWeight, totalVolume, totalDuration: 0, totalDistance: 0 };
   });
 
   return {
     id: exercise.id,
     name: exercise.name,
     muscleGroup: exercise.muscleGroup,
+    type: exercise.type,
     isSystem: exercise.isSystem,
     description: exercise.description,
     muscleGroups: exercise.muscleGroups,

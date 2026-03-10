@@ -6,6 +6,7 @@ interface Exercise {
   id: number;
   name: string;
   muscleGroup: string;
+  type?: string;
 }
 
 interface ExercisePickerProps {

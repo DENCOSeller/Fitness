@@ -10,15 +10,18 @@ type WorkoutEntry = {
   workoutId: number;
   date: string;
   workoutType: string;
-  sets: { setOrder: number; reps: number; weight: number }[];
+  sets: { setOrder: number; reps: number; weight: number; duration: number | null; distance: number | null; speed: number | null; incline: number | null; heartRate: number | null }[];
   maxWeight: number;
   totalVolume: number;
+  totalDuration: number;
+  totalDistance: number;
 };
 
 type ExerciseData = {
   id: number;
   name: string;
   muscleGroup: string;
+  type?: string;
   isSystem: boolean;
   description: string | null;
   muscleGroups: string | null;
@@ -72,6 +75,8 @@ export default function ExerciseProgressPage() {
       </div>
     );
   }
+
+  const isCardio = data.type === 'cardio' || data.muscleGroup === 'Кардио';
 
   const chartData = data.history.map((entry) => ({
     date: new Date(entry.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }),
@@ -141,18 +146,37 @@ export default function ExerciseProgressPage() {
       {/* Stats summary */}
       {data.history.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
-          <div className="bg-card rounded-2xl p-3 text-center">
-            <div className="text-lg font-bold text-accent">
-              {Math.max(...data.history.map((h) => h.maxWeight))}
-            </div>
-            <div className="text-xs text-text-secondary">Макс. вес, кг</div>
-          </div>
-          <div className="bg-card rounded-2xl p-3 text-center">
-            <div className="text-lg font-bold text-accent">
-              {Math.max(...data.history.map((h) => h.totalVolume))}
-            </div>
-            <div className="text-xs text-text-secondary">Макс. объём</div>
-          </div>
+          {isCardio ? (
+            <>
+              <div className="bg-card rounded-2xl p-3 text-center">
+                <div className="text-lg font-bold text-accent">
+                  {data.history.reduce((sum, h) => sum + h.totalDuration, 0)}
+                </div>
+                <div className="text-xs text-text-secondary">Всего мин</div>
+              </div>
+              <div className="bg-card rounded-2xl p-3 text-center">
+                <div className="text-lg font-bold text-accent">
+                  {data.history.reduce((sum, h) => sum + h.totalDistance, 0).toFixed(1)}
+                </div>
+                <div className="text-xs text-text-secondary">Всего км</div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="bg-card rounded-2xl p-3 text-center">
+                <div className="text-lg font-bold text-accent">
+                  {Math.max(...data.history.map((h) => h.maxWeight))}
+                </div>
+                <div className="text-xs text-text-secondary">Макс. вес, кг</div>
+              </div>
+              <div className="bg-card rounded-2xl p-3 text-center">
+                <div className="text-lg font-bold text-accent">
+                  {Math.max(...data.history.map((h) => h.totalVolume))}
+                </div>
+                <div className="text-xs text-text-secondary">Макс. объём</div>
+              </div>
+            </>
+          )}
           <div className="bg-card rounded-2xl p-3 text-center">
             <div className="text-lg font-bold text-accent">
               {data.history.length}
@@ -183,20 +207,48 @@ export default function ExerciseProgressPage() {
                   </span>
                   <span className="text-xs text-text-secondary">{entry.workoutType}</span>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {entry.sets.map((set) => (
-                    <span
-                      key={set.setOrder}
-                      className="bg-bg rounded-lg px-2 py-0.5 text-xs text-text-secondary"
-                    >
-                      {set.reps}&times;{set.weight}кг
-                    </span>
-                  ))}
-                </div>
-                <div className="flex gap-4 text-xs text-text-secondary">
-                  <span>Макс: <span className="text-text font-medium">{entry.maxWeight} кг</span></span>
-                  <span>Объём: <span className="text-text font-medium">{entry.totalVolume}</span></span>
-                </div>
+                {isCardio ? (
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {entry.sets.map((set) => {
+                        const parts: string[] = [];
+                        if (set.duration) parts.push(`${set.duration} мин`);
+                        if (set.distance) parts.push(`${set.distance} км`);
+                        if (set.speed) parts.push(`${set.speed} км/ч`);
+                        if (set.heartRate) parts.push(`пульс ${set.heartRate}`);
+                        return (
+                          <span
+                            key={set.setOrder}
+                            className="bg-bg rounded-lg px-2 py-0.5 text-xs text-text-secondary"
+                          >
+                            {parts.join(', ') || '—'}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <div className="flex gap-4 text-xs text-text-secondary">
+                      {entry.totalDuration > 0 && <span>Время: <span className="text-text font-medium">{entry.totalDuration} мин</span></span>}
+                      {entry.totalDistance > 0 && <span>Дистанция: <span className="text-text font-medium">{entry.totalDistance} км</span></span>}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {entry.sets.map((set) => (
+                        <span
+                          key={set.setOrder}
+                          className="bg-bg rounded-lg px-2 py-0.5 text-xs text-text-secondary"
+                        >
+                          {set.reps}&times;{set.weight}кг
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex gap-4 text-xs text-text-secondary">
+                      <span>Макс: <span className="text-text font-medium">{entry.maxWeight} кг</span></span>
+                      <span>Объём: <span className="text-text font-medium">{entry.totalVolume}</span></span>
+                    </div>
+                  </>
+                )}
               </Link>
             ))}
           </div>

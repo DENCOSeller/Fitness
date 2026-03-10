@@ -10,6 +10,7 @@ interface ExerciseSeed {
   equipment: string;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   tips: string;
+  type?: 'strength' | 'cardio' | 'flexibility';
 }
 
 const exercises: ExerciseSeed[] = [
@@ -828,6 +829,7 @@ async function main() {
         equipment: ex.equipment,
         difficulty: ex.difficulty,
         tips: ex.tips,
+        type: ex.type || (ex.muscleGroup === 'Кардио' ? 'cardio' : ex.muscleGroup === 'Растяжка' ? 'flexibility' : 'strength'),
         isSystem: true,
       },
     });

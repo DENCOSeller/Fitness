@@ -7,6 +7,7 @@ import { createWorkout, createExerciseFromWorkout } from '../actions';
 import { getExercises } from '../../exercises/actions';
 import { getTemplate } from '../templates/actions';
 import SetInput from '@/components/workout/set-input';
+import CardioSetInput, { CardioSetData } from '@/components/workout/cardio-set-input';
 import ExercisePicker from '@/components/workout/exercise-picker';
 import RestTimer from '@/components/workout/rest-timer';
 
@@ -14,14 +15,25 @@ interface Exercise {
   id: number;
   name: string;
   muscleGroup: string;
+  type?: string;
+}
+
+interface StrengthSet {
+  reps: number;
+  weight: number;
 }
 
 interface WorkoutExercise {
   exercise: Exercise;
-  sets: { reps: number; weight: number }[];
+  sets: StrengthSet[];
+  cardio?: CardioSetData;
 }
 
 const workoutTypes = ['Силовая', 'Кардио', 'Растяжка', 'Своё'];
+
+function isCardioExercise(exercise: Exercise): boolean {
+  return exercise.type === 'cardio' || exercise.muscleGroup === 'Кардио';
+}
 
 export default function NewWorkoutPage() {
   return (
@@ -59,12 +71,15 @@ function NewWorkoutContent() {
         if (result.template) {
           const t = result.template;
           setWorkoutExercises(
-            t.exercises.map((te) => ({
+            t.exercises.map((te: { exercise: Exercise; sets: number; reps: number; weight: number }) => ({
               exercise: te.exercise,
               sets: Array.from({ length: te.sets }, () => ({
                 reps: te.reps,
                 weight: te.weight,
               })),
+              ...(isCardioExercise(te.exercise) ? {
+                cardio: { duration: 0, distance: 0, speed: 0, incline: 0, heartRate: 0 }
+              } : {}),
             }))
           );
         }
@@ -73,10 +88,21 @@ function NewWorkoutContent() {
   }, [searchParams, templateLoaded]);
 
   const handleSelectExercise = (exercise: Exercise) => {
-    setWorkoutExercises((prev) => [
-      ...prev,
-      { exercise, sets: [{ reps: 0, weight: 0 }] },
-    ]);
+    if (isCardioExercise(exercise)) {
+      setWorkoutExercises((prev) => [
+        ...prev,
+        {
+          exercise,
+          sets: [],
+          cardio: { duration: 0, distance: 0, speed: 0, incline: 0, heartRate: 0 },
+        },
+      ]);
+    } else {
+      setWorkoutExercises((prev) => [
+        ...prev,
+        { exercise, sets: [{ reps: 0, weight: 0 }] },
+      ]);
+    }
     setShowPicker(false);
   };
 
@@ -99,6 +125,14 @@ function NewWorkoutContent() {
         ...next[exIdx],
         sets: next[exIdx].sets.map((s, i) => (i === setIdx ? data : s)),
       };
+      return next;
+    });
+  };
+
+  const updateCardio = (exIdx: number, data: CardioSetData) => {
+    setWorkoutExercises((prev) => {
+      const next = [...prev];
+      next[exIdx] = { ...next[exIdx], cardio: data };
       return next;
     });
   };
@@ -138,11 +172,19 @@ function NewWorkoutContent() {
     }
 
     for (const ex of workoutExercises) {
-      for (const set of ex.sets) {
-        if (set.reps <= 0) {
-          setError(`Укажите повторения для "${ex.exercise.name}"`);
+      if (isCardioExercise(ex.exercise)) {
+        if (!ex.cardio?.duration || ex.cardio.duration <= 0) {
+          setError(`Укажите длительность для "${ex.exercise.name}"`);
           setTimeout(() => setError(''), 3000);
           return;
+        }
+      } else {
+        for (const set of ex.sets) {
+          if (set.reps <= 0) {
+            setError(`Укажите повторения для "${ex.exercise.name}"`);
+            setTimeout(() => setError(''), 3000);
+            return;
+          }
         }
       }
     }
@@ -156,10 +198,20 @@ function NewWorkoutContent() {
         type,
         durationMin: durationMin ? parseInt(durationMin) : undefined,
         note: note || undefined,
-        exercises: workoutExercises.map((we) => ({
-          exerciseId: we.exercise.id,
-          sets: we.sets,
-        })),
+        exercises: workoutExercises.map((we) => {
+          if (isCardioExercise(we.exercise) && we.cardio) {
+            return {
+              exerciseId: we.exercise.id,
+              isCardio: true,
+              cardio: we.cardio,
+              sets: [],
+            };
+          }
+          return {
+            exerciseId: we.exercise.id,
+            sets: we.sets,
+          };
+        }),
       });
 
       if (result.error) {
@@ -250,44 +302,53 @@ function NewWorkoutContent() {
               </button>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-text-secondary text-xs px-1">
-                <span className="w-6 text-center">#</span>
-                <span className="flex-1 text-center">Повт.</span>
-                <span className="w-3" />
-                <span className="flex-1 text-center">Вес</span>
-                <span className="w-6" />
-                <span className="w-5" />
-              </div>
-              {we.sets.map((set, setIdx) => (
-                <SetInput
-                  key={setIdx}
-                  index={setIdx}
-                  data={set}
-                  onChange={(data) => updateSet(exIdx, setIdx, data)}
-                  onRemove={() => removeSet(exIdx, setIdx)}
-                  canRemove={we.sets.length > 1}
-                />
-              ))}
-            </div>
+            {isCardioExercise(we.exercise) && we.cardio ? (
+              <CardioSetInput
+                data={we.cardio}
+                onChange={(data) => updateCardio(exIdx, data)}
+              />
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-text-secondary text-xs px-1">
+                    <span className="w-6 text-center">#</span>
+                    <span className="flex-1 text-center">Повт.</span>
+                    <span className="w-3" />
+                    <span className="flex-1 text-center">Вес</span>
+                    <span className="w-6" />
+                    <span className="w-5" />
+                  </div>
+                  {we.sets.map((set, setIdx) => (
+                    <SetInput
+                      key={setIdx}
+                      index={setIdx}
+                      data={set}
+                      onChange={(data) => updateSet(exIdx, setIdx, data)}
+                      onRemove={() => removeSet(exIdx, setIdx)}
+                      canRemove={we.sets.length > 1}
+                    />
+                  ))}
+                </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => addSet(exIdx)}
-                className="flex-1 text-accent text-sm py-1.5 hover:bg-accent/10 rounded-lg transition-colors"
-              >
-                + Подход
-              </button>
-              <button
-                onClick={() => setShowTimer(true)}
-                className="text-text-secondary text-sm py-1.5 px-3 hover:bg-accent/10 hover:text-accent rounded-lg transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 inline mr-1 -mt-0.5">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clipRule="evenodd" />
-                </svg>
-                Отдых
-              </button>
-            </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => addSet(exIdx)}
+                    className="flex-1 text-accent text-sm py-1.5 hover:bg-accent/10 rounded-lg transition-colors"
+                  >
+                    + Подход
+                  </button>
+                  <button
+                    onClick={() => setShowTimer(true)}
+                    className="text-text-secondary text-sm py-1.5 px-3 hover:bg-accent/10 hover:text-accent rounded-lg transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 inline mr-1 -mt-0.5">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clipRule="evenodd" />
+                    </svg>
+                    Отдых
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         ))}
 

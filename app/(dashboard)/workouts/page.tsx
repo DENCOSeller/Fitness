@@ -11,9 +11,11 @@ interface WorkoutWithSets {
   durationMin: number | null;
   note: string | null;
   sets: {
-    exercise: { id: number; name: string; muscleGroup: string };
+    exercise: { id: number; name: string; muscleGroup: string; type?: string };
     reps: number;
     weight: number;
+    duration: number | null;
+    distance: number | null;
   }[];
   _count: { sets: number };
 }
@@ -44,7 +46,20 @@ export default function WorkoutsPage() {
   };
 
   const getTotalVolume = (sets: WorkoutWithSets['sets']) => {
-    return sets.reduce((sum, s) => sum + s.reps * s.weight, 0);
+    return sets
+      .filter(s => !(s.exercise.type === 'cardio' || s.exercise.muscleGroup === 'Кардио' || s.duration != null))
+      .reduce((sum, s) => sum + s.reps * s.weight, 0);
+  };
+
+  const getCardioSummary = (sets: WorkoutWithSets['sets']) => {
+    const cardioSets = sets.filter(s => s.exercise.type === 'cardio' || s.exercise.muscleGroup === 'Кардио' || s.duration != null);
+    if (cardioSets.length === 0) return null;
+    const totalDuration = cardioSets.reduce((sum, s) => sum + (s.duration || 0), 0);
+    const totalDistance = cardioSets.reduce((sum, s) => sum + (s.distance || 0), 0);
+    const parts: string[] = [];
+    if (totalDuration > 0) parts.push(`${totalDuration} мин`);
+    if (totalDistance > 0) parts.push(`${totalDistance} км`);
+    return parts.join(', ');
   };
 
   return (
@@ -86,6 +101,7 @@ export default function WorkoutsPage() {
       {workouts.map((w) => {
         const uniqueExercises = getUniqueExercises(w.sets);
         const volume = getTotalVolume(w.sets);
+        const cardioSummary = getCardioSummary(w.sets);
 
         return (
           <Link
@@ -118,6 +134,7 @@ export default function WorkoutsPage() {
               <span>{uniqueExercises.length} упр.</span>
               <span>{w._count.sets} подх.</span>
               {volume > 0 && <span>{volume.toLocaleString('ru-RU')} кг объём</span>}
+              {cardioSummary && <span>{cardioSummary}</span>}
             </div>
           </Link>
         );

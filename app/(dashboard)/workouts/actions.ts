@@ -10,6 +10,14 @@ export async function createWorkout(data: {
   note?: string;
   exercises: {
     exerciseId: number;
+    isCardio?: boolean;
+    cardio?: {
+      duration: number;
+      distance: number;
+      speed: number;
+      incline: number;
+      heartRate: number;
+    };
     sets: { reps: number; weight: number }[];
   }[];
 }) {
@@ -24,11 +32,27 @@ export async function createWorkout(data: {
     return { error: 'Добавьте хотя бы одно упражнение' };
   }
 
-  for (const ex of exercises) {
-    if (ex.sets.length === 0) {
-      return { error: 'Каждое упражнение должно иметь хотя бы один подход' };
+  const setsData = exercises.flatMap((ex, exIdx) => {
+    if (ex.isCardio && ex.cardio) {
+      return [{
+        exerciseId: ex.exerciseId,
+        setOrder: exIdx * 100 + 1,
+        reps: 0,
+        weight: 0,
+        duration: ex.cardio.duration || null,
+        distance: ex.cardio.distance || null,
+        speed: ex.cardio.speed || null,
+        incline: ex.cardio.incline || null,
+        heartRate: ex.cardio.heartRate || null,
+      }];
     }
-  }
+    return ex.sets.map((set, setIdx) => ({
+      exerciseId: ex.exerciseId,
+      setOrder: exIdx * 100 + setIdx + 1,
+      reps: set.reps,
+      weight: set.weight,
+    }));
+  });
 
   const workout = await prisma.workout.create({
     data: {
@@ -37,16 +61,7 @@ export async function createWorkout(data: {
       type: type.trim(),
       durationMin: durationMin || null,
       note: note?.trim() || null,
-      sets: {
-        create: exercises.flatMap((ex, exIdx) =>
-          ex.sets.map((set, setIdx) => ({
-            exerciseId: ex.exerciseId,
-            setOrder: exIdx * 100 + setIdx + 1,
-            reps: set.reps,
-            weight: set.weight,
-          }))
-        ),
-      },
+      sets: { create: setsData },
     },
   });
 
@@ -122,7 +137,12 @@ export async function createExerciseFromWorkout(data: { name: string; muscleGrou
   }
 
   const exercise = await prisma.exercise.create({
-    data: { userId, name, muscleGroup },
+    data: {
+      userId,
+      name,
+      muscleGroup,
+      type: muscleGroup === 'Кардио' ? 'cardio' : muscleGroup === 'Растяжка' ? 'flexibility' : 'strength',
+    },
   });
 
   return { exercise };

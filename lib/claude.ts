@@ -4,10 +4,10 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-export async function askClaude(prompt: string, model = 'claude-sonnet-4-6'): Promise<string> {
+export async function askClaude(prompt: string, model = 'claude-sonnet-4-6', maxTokens = 1024): Promise<string> {
   const response = await client.messages.create({
     model,
-    max_tokens: 1024,
+    max_tokens: maxTokens,
     messages: [{ role: 'user', content: prompt }],
   });
 

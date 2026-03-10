@@ -1,7 +1,10 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { getHealthDaily, getHealthWorkouts, getHealthStats } from './actions';
+import { getHealthDaily, getHealthWorkouts, getHealthStats, getHealthDailyByPeriod } from './actions';
+import HealthStepsChart from '@/components/charts/health-steps-chart';
+import HealthSleepChart from '@/components/charts/health-sleep-chart';
+import HealthHrChart from '@/components/charts/health-hr-chart';
 
 type HealthDailyRecord = {
   id: number;
@@ -36,6 +39,16 @@ type ImportResult = {
   error?: string;
 };
 
+type Period = 'week' | 'month' | '3months' | 'year';
+
+type ChartData = {
+  date: string;
+  steps: number | null;
+  activeCalories: number | null;
+  restingHr: number | null;
+  sleepHours: number | null;
+};
+
 type Tab = 'daily' | 'workouts';
 
 function formatDisplayDate(dateStr: string): string {
@@ -59,11 +72,17 @@ export default function HealthPage() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<Tab>('daily');
+  const [period, setPeriod] = useState<Period>('month');
+  const [chartData, setChartData] = useState<ChartData[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    loadChartData(period);
+  }, [period]);
 
   async function loadData() {
     const [daily, wk, st] = await Promise.all([
@@ -74,6 +93,11 @@ export default function HealthPage() {
     setDailyRecords(daily);
     setWorkouts(wk);
     setStats(st);
+  }
+
+  async function loadChartData(p: Period) {
+    const data = await getHealthDailyByPeriod(p);
+    setChartData(data);
   }
 
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -105,6 +129,7 @@ export default function HealthPage() {
 
       setImportResult(data);
       await loadData();
+      await loadChartData(period);
     } catch {
       setError('Ошибка импорта файла');
     } finally {
@@ -206,6 +231,95 @@ export default function HealthPage() {
           </div>
         )}
       </div>
+
+      {/* Charts section */}
+      {chartData.length > 0 && (
+        <div className="space-y-4">
+          {/* Period switcher */}
+          <div className="flex gap-1.5 bg-card rounded-xl p-1.5">
+            {([
+              ['week', 'Неделя'],
+              ['month', 'Месяц'],
+              ['3months', '3 мес'],
+              ['year', 'Год'],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setPeriod(key)}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  period === key
+                    ? 'bg-accent text-white'
+                    : 'text-text-secondary hover:text-text'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Averages */}
+          {(() => {
+            const stepsArr = chartData.filter((d) => d.steps != null).map((d) => d.steps!);
+            const calArr = chartData.filter((d) => d.activeCalories != null).map((d) => d.activeCalories!);
+            const hrArr = chartData.filter((d) => d.restingHr != null).map((d) => d.restingHr!);
+            const sleepArr = chartData.filter((d) => d.sleepHours != null).map((d) => d.sleepHours!);
+            const avg = (arr: number[]) => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+            const avgSleep = (arr: number[]) => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1) : null;
+
+            const avgSteps = avg(stepsArr);
+            const avgCal = avg(calArr);
+            const avgHr = avg(hrArr);
+            const avgSl = avgSleep(sleepArr);
+
+            return (
+              <div className="grid grid-cols-4 gap-2">
+                {avgSteps != null && (
+                  <div className="bg-card rounded-xl p-2.5 text-center">
+                    <div className="text-sm font-bold">{formatNumber(avgSteps)}</div>
+                    <div className="text-[10px] text-text-secondary">шаг/день</div>
+                  </div>
+                )}
+                {avgCal != null && (
+                  <div className="bg-card rounded-xl p-2.5 text-center">
+                    <div className="text-sm font-bold">{formatNumber(avgCal)}</div>
+                    <div className="text-[10px] text-text-secondary">ккал/день</div>
+                  </div>
+                )}
+                {avgHr != null && (
+                  <div className="bg-card rounded-xl p-2.5 text-center">
+                    <div className="text-sm font-bold">{avgHr}</div>
+                    <div className="text-[10px] text-text-secondary">пульс</div>
+                  </div>
+                )}
+                {avgSl != null && (
+                  <div className="bg-card rounded-xl p-2.5 text-center">
+                    <div className="text-sm font-bold">{avgSl}ч</div>
+                    <div className="text-[10px] text-text-secondary">сон</div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Steps + Calories chart */}
+          <div className="bg-card rounded-2xl p-4">
+            <h3 className="text-sm font-semibold mb-3">Шаги и калории</h3>
+            <HealthStepsChart data={chartData} />
+          </div>
+
+          {/* Sleep chart */}
+          <div className="bg-card rounded-2xl p-4">
+            <h3 className="text-sm font-semibold mb-3">Сон</h3>
+            <HealthSleepChart data={chartData} />
+          </div>
+
+          {/* Heart rate chart */}
+          <div className="bg-card rounded-2xl p-4">
+            <h3 className="text-sm font-semibold mb-3">Пульс покоя</h3>
+            <HealthHrChart data={chartData} />
+          </div>
+        </div>
+      )}
 
       {/* Data tabs */}
       {(dailyRecords.length > 0 || workouts.length > 0) && (

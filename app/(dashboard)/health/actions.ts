@@ -34,6 +34,30 @@ export async function getHealthWorkouts(limit: number = 50) {
   }));
 }
 
+export async function getHealthDailyByPeriod(period: 'week' | 'month' | '3months' | 'year') {
+  const now = new Date();
+  const from = new Date();
+  switch (period) {
+    case 'week': from.setDate(now.getDate() - 7); break;
+    case 'month': from.setMonth(now.getMonth() - 1); break;
+    case '3months': from.setMonth(now.getMonth() - 3); break;
+    case 'year': from.setFullYear(now.getFullYear() - 1); break;
+  }
+
+  const records = await prisma.healthDaily.findMany({
+    where: { date: { gte: from } },
+    orderBy: { date: 'asc' },
+  });
+
+  return records.map((r) => ({
+    date: r.date.toISOString().split('T')[0],
+    steps: r.steps,
+    activeCalories: r.activeCalories,
+    restingHr: r.restingHr,
+    sleepHours: r.sleepHours,
+  }));
+}
+
 export async function getHealthStats() {
   const totalDaily = await prisma.healthDaily.count();
   const totalWorkouts = await prisma.healthWorkout.count();

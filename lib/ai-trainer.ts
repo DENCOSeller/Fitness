@@ -61,6 +61,17 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
 
   const fmt = (d: Date) => d.toISOString().split('T')[0];
 
+  // Debug: log what was fetched
+  console.log('[AI-Trainer] userId:', uid);
+  console.log('[AI-Trainer] user:', user?.name, 'height:', user?.height, 'goal:', user?.goal);
+  console.log('[AI-Trainer] checkIns:', checkIns.length);
+  console.log('[AI-Trainer] workouts:', workouts.length, workouts.map(w => ({ date: fmt(w.date), type: w.type, sets: w.sets.length })));
+  console.log('[AI-Trainer] meals:', meals.length);
+  console.log('[AI-Trainer] bodyMetrics:', bodyMetrics.length, bodyMetrics.map(b => ({ date: fmt(b.date), weight: b.weight })));
+  console.log('[AI-Trainer] healthDaily:', healthDaily.length);
+  console.log('[AI-Trainer] exercises catalog:', systemExercises.length);
+  console.log('[AI-Trainer] equipment:', userEquipment.length);
+
   // Build context sections
   const sections: string[] = [];
 
@@ -187,7 +198,12 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
     ? sections.join('\n\n')
     : 'Данных пока нет. Пользователь только начал использовать трекер.';
 
+  // Debug: log final context size
+  console.log('[AI-Trainer] context sections:', sections.length, 'total chars:', context.length);
+
   return `Ты — персональный фитнес-тренер в приложении DENCO Health. Твоё имя — DENCO Тренер.
+
+ВАЖНО: У тебя ЕСТЬ полный доступ к истории тренировок, питания, замеров тела и чек-инов пользователя. Все данные приведены ниже в разделе "Данные пользователя". ОБЯЗАТЕЛЬНО используй эти данные при ответах — ссылайся на конкретные тренировки, веса, даты, упражнения. Никогда не говори что у тебя нет доступа к данным, если они указаны ниже.
 
 Твои задачи:
 - Давать персональные советы по тренировкам, питанию, восстановлению
@@ -198,7 +214,7 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
 
 Правила:
 - Отвечай на русском языке
-- Будь конкретным — используй данные пользователя в ответах
+- Будь конкретным — используй данные пользователя в ответах, ссылайся на конкретные цифры и даты
 - Не выдумывай данные, которых нет в контексте
 - Если данных мало, скажи об этом и дай общие рекомендации
 - Будь дружелюбным, но профессиональным

@@ -185,9 +185,9 @@ export default function TrainerPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-5rem)] md:h-[calc(100dvh-1rem)] overflow-hidden">
+    <div className="flex flex-col h-[calc(100dvh-5rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-1rem)] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-border">
+      <div className="flex items-center justify-between pb-3 border-b border-[#38383A]/50 flex-shrink-0">
         <div className="flex items-center gap-3">
           <Link
             href="/ai"
@@ -276,9 +276,9 @@ export default function TrainerPage() {
       )}
 
       {/* Messages area */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto py-4 space-y-1">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 flex flex-col">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4">
+          <div className="flex flex-col items-center justify-center flex-1 text-center px-4">
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#0A84FF] to-[#5E5CE6] flex items-center justify-center mb-4">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-white">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
@@ -308,59 +308,65 @@ export default function TrainerPage() {
           </div>
         )}
 
-        {messages.map((msg, i) => {
-          const isUser = msg.role === 'user';
-          const isLastAssistant = !isUser && i === messages.length - 1;
-          const isEmptyStreaming = isLastAssistant && isStreaming && !msg.content;
+        {/* Spacer pushes messages to bottom when few messages */}
+        <div className="flex-1" />
 
-          return (
-            <div
-              key={i}
-              className={`flex items-end gap-2 animate-[fadeSlideIn_0.3s_ease-out] ${isUser ? 'justify-end' : 'justify-start'}`}
-              style={{ animationFillMode: 'both', animationDelay: `${Math.min(i * 50, 300)}ms` }}
-            >
-              {/* AI avatar */}
-              {!isUser && (
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#0A84FF] to-[#5E5CE6] flex items-center justify-center flex-shrink-0 mb-5">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5 text-white">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                  </svg>
-                </div>
-              )}
+        {/* Messages list */}
+        <div className="space-y-1 py-4">
+          {messages.map((msg, i) => {
+            const isUser = msg.role === 'user';
+            const isLastAssistant = !isUser && i === messages.length - 1;
+            const isEmptyStreaming = isLastAssistant && isStreaming && !msg.content;
 
-              <div className={`max-w-[80%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
-                <div
-                  className={`rounded-2xl px-3.5 py-2.5 ${
-                    isUser
-                      ? 'bg-[#0A84FF] text-white rounded-br-md'
-                      : 'bg-[#1C1C1E] rounded-bl-md'
-                  }`}
-                >
-                  {isEmptyStreaming ? (
-                    <TypingIndicator />
-                  ) : isUser ? (
-                    <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                  ) : (
-                    <div className="text-[15px] leading-relaxed">
-                      <FormattedText text={msg.content} />
-                      {isStreaming && isLastAssistant && msg.content && (
-                        <span className="inline-block w-[3px] h-[18px] bg-[#0A84FF] animate-pulse ml-0.5 align-middle rounded-full" />
-                      )}
-                    </div>
+            return (
+              <div
+                key={i}
+                className={`flex items-end gap-2 animate-[fadeSlideIn_0.3s_ease-out] ${isUser ? 'justify-end' : 'justify-start'}`}
+                style={{ animationFillMode: 'both', animationDelay: `${Math.min(i * 50, 300)}ms` }}
+              >
+                {/* AI avatar */}
+                {!isUser && (
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#0A84FF] to-[#5E5CE6] flex items-center justify-center flex-shrink-0 mb-5">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3.5 h-3.5 text-white">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                    </svg>
+                  </div>
+                )}
+
+                <div className={`max-w-[80%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
+                  <div
+                    className={`rounded-2xl px-3.5 py-2.5 ${
+                      isUser
+                        ? 'bg-[#0A84FF] text-white rounded-br-md'
+                        : 'bg-[#1C1C1E] rounded-bl-md'
+                    }`}
+                  >
+                    {isEmptyStreaming ? (
+                      <TypingIndicator />
+                    ) : isUser ? (
+                      <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    ) : (
+                      <div className="text-[15px] leading-relaxed">
+                        <FormattedText text={msg.content} />
+                        {isStreaming && isLastAssistant && msg.content && (
+                          <span className="inline-block w-[3px] h-[18px] bg-[#0A84FF] animate-pulse ml-0.5 align-middle rounded-full" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {/* Timestamp */}
+                  {msg.timestamp && !(isEmptyStreaming) && (
+                    <span className={`text-[10px] text-[#636366] mt-1 px-1 ${isUser ? 'self-end' : 'self-start'}`}>
+                      {msg.timestamp}
+                    </span>
                   )}
                 </div>
-                {/* Timestamp */}
-                {msg.timestamp && !(isEmptyStreaming) && (
-                  <span className={`text-[10px] text-[#636366] mt-1 px-1 ${isUser ? 'self-end' : 'self-start'}`}>
-                    {msg.timestamp}
-                  </span>
-                )}
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
 
-        <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* Error */}
@@ -369,7 +375,7 @@ export default function TrainerPage() {
       )}
 
       {/* Input area */}
-      <div className="pt-2 pb-1 border-t border-[#38383A]/50">
+      <div className="flex-shrink-0 pt-2 pb-1">
         <div className="flex items-end gap-2 bg-[#1C1C1E] rounded-2xl px-3 py-1.5 border border-[#38383A]/50 focus-within:border-[#0A84FF]/50 transition-colors">
           <textarea
             ref={inputRef}
@@ -391,7 +397,6 @@ export default function TrainerPage() {
             </svg>
           </button>
         </div>
-        <p className="text-[10px] text-[#48484A] text-center mt-1">Shift+Enter для переноса строки</p>
       </div>
 
       {/* Animation keyframes */}

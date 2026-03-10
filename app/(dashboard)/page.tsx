@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentUserId } from '@/lib/auth';
 import { getCalorieBalance } from '@/lib/calorie-balance';
 import CalorieBalanceWidget from '@/components/dashboard/calorie-balance';
+import BodyMetricsWidget from '@/components/dashboard/body-metrics-widget';
 import Link from 'next/link';
 
 function formatDate(date: Date): string {
@@ -36,15 +37,11 @@ export default async function DashboardPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
   const calorieBalance = await getCalorieBalance();
 
   const [
     latestMetrics,
     previousMetrics,
-    weightHistory,
     lastWorkout,
     todayCheckin,
     user,
@@ -58,11 +55,6 @@ export default async function DashboardPage() {
       orderBy: { date: 'desc' },
       skip: 1,
       take: 1,
-    }),
-    prisma.bodyMetric.findMany({
-      where: { userId, date: { gte: thirtyDaysAgo }, weight: { not: null } },
-      orderBy: { date: 'asc' },
-      select: { date: true, weight: true },
     }),
     prisma.workout.findFirst({
       where: { userId },
@@ -84,28 +76,6 @@ export default async function DashboardPage() {
   ]);
 
   const prev = previousMetrics[0] || null;
-
-  // Weight chart data (mini sparkline)
-  const weightPoints = weightHistory.map(w => w.weight!);
-  const weightMin = weightPoints.length > 0 ? Math.min(...weightPoints) - 0.5 : 0;
-  const weightMax = weightPoints.length > 0 ? Math.max(...weightPoints) + 0.5 : 1;
-  const weightRange = weightMax - weightMin || 1;
-
-  // Build SVG path for sparkline
-  const svgWidth = 280;
-  const svgHeight = 80;
-  const sparklinePath = weightPoints.length > 1
-    ? weightPoints.map((w, i) => {
-        const x = (i / (weightPoints.length - 1)) * svgWidth;
-        const y = svgHeight - ((w - weightMin) / weightRange) * svgHeight;
-        return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-      }).join(' ')
-    : '';
-
-  // Gradient area path
-  const areaPath = sparklinePath && weightPoints.length > 1
-    ? `${sparklinePath} L${svgWidth},${svgHeight} L0,${svgHeight} Z`
-    : '';
 
   // Unique exercises in last workout
   const lastWorkoutExercises = lastWorkout
@@ -130,66 +100,18 @@ export default async function DashboardPage() {
         <p className="text-text-secondary text-sm mt-0.5 capitalize">{formatDate(new Date())}</p>
       </div>
 
-      {/* Body Metrics Cards */}
-      <div className="grid grid-cols-3 gap-3">
-        <MetricCard
-          label="Вес"
-          value={latestMetrics?.weight}
-          unit="кг"
-          delta={weightDelta}
-          invertDelta
-        />
-        <MetricCard
-          label="Жир"
-          value={latestMetrics?.bodyFatPct}
-          unit="%"
-          delta={fatDelta}
-          invertDelta
-        />
-        <MetricCard
-          label="Мышцы"
-          value={latestMetrics?.muscleMass}
-          unit="кг"
-          delta={muscleDelta}
-        />
-      </div>
+      {/* Body Metrics — interactive cards + chart */}
+      <BodyMetricsWidget
+        initialWeight={latestMetrics?.weight ?? null}
+        initialFat={latestMetrics?.bodyFatPct ?? null}
+        initialMuscle={latestMetrics?.muscleMass ?? null}
+        weightDelta={weightDelta}
+        fatDelta={fatDelta}
+        muscleDelta={muscleDelta}
+      />
 
       {/* Calorie Balance */}
       <CalorieBalanceWidget data={calorieBalance} />
-
-      {/* Weight Chart */}
-      <div className="rounded-2xl bg-card p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium text-text-secondary">Вес за 30 дней</h2>
-          {weightPoints.length > 0 && (
-            <span className="text-xs text-text-secondary">
-              {weightPoints[0].toFixed(1)} → {weightPoints[weightPoints.length - 1].toFixed(1)} кг
-            </span>
-          )}
-        </div>
-        {weightPoints.length > 1 ? (
-          <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-20" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0A84FF" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="#0A84FF" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path d={areaPath} fill="url(#weightGrad)" />
-            <path d={sparklinePath} fill="none" stroke="#0A84FF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            {/* Last point dot */}
-            {(() => {
-              const lastX = svgWidth;
-              const lastY = svgHeight - ((weightPoints[weightPoints.length - 1] - weightMin) / weightRange) * svgHeight;
-              return <circle cx={lastX} cy={lastY} r="4" fill="#0A84FF" />;
-            })()}
-          </svg>
-        ) : (
-          <div className="h-20 flex items-center justify-center">
-            <p className="text-text-secondary text-sm">Нет данных</p>
-          </div>
-        )}
-      </div>
 
       {/* Last Workout */}
       <Link href={lastWorkout ? `/workouts/${lastWorkout.id}` : '/workouts/new'} className="block">
@@ -283,50 +205,6 @@ export default async function DashboardPage() {
           </div>
         </div>
       </Link>
-    </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  unit,
-  delta,
-  invertDelta = false,
-}: {
-  label: string;
-  value: number | null | undefined;
-  unit: string;
-  delta: number | null;
-  invertDelta?: boolean;
-}) {
-  const isPositive = delta !== null && delta > 0;
-  const isNegative = delta !== null && delta < 0;
-  // For weight/fat: going down is good (green). For muscle: going up is good.
-  const isGood = invertDelta ? isNegative : isPositive;
-  const isBad = invertDelta ? isPositive : isNegative;
-
-  return (
-    <div className="rounded-2xl bg-card p-3">
-      <p className="text-xs text-text-secondary mb-1">{label}</p>
-      <p className="text-xl font-bold">
-        {value != null ? value.toFixed(1) : '—'}
-        {value != null && <span className="text-xs font-normal text-text-secondary ml-0.5">{unit}</span>}
-      </p>
-      {delta !== null && delta !== 0 && (
-        <div className={`flex items-center gap-0.5 mt-1 text-xs ${isGood ? 'text-success' : isBad ? 'text-danger' : 'text-text-secondary'}`}>
-          {isPositive ? (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
-              <path fillRule="evenodd" d="M8 3.5a.5.5 0 01.5.5v7.793l2.146-2.147a.5.5 0 01.708.708l-3 3a.5.5 0 01-.708 0l-3-3a.5.5 0 11.708-.708L7.5 11.793V4a.5.5 0 01.5-.5z" transform="rotate(180 8 8)" />
-            </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
-              <path fillRule="evenodd" d="M8 3.5a.5.5 0 01.5.5v7.793l2.146-2.147a.5.5 0 01.708.708l-3 3a.5.5 0 01-.708 0l-3-3a.5.5 0 11.708-.708L7.5 11.793V4a.5.5 0 01.5-.5z" />
-            </svg>
-          )}
-          <span>{Math.abs(delta)}</span>
-        </div>
-      )}
     </div>
   );
 }

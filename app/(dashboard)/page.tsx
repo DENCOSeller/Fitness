@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/db';
 import { getCurrentUserId } from '@/lib/auth';
+import { getCalorieBalance } from '@/lib/calorie-balance';
+import CalorieBalanceWidget from '@/components/dashboard/calorie-balance';
 import Link from 'next/link';
 
 function formatDate(date: Date): string {
@@ -36,6 +38,8 @@ export default async function DashboardPage() {
 
   const thirtyDaysAgo = new Date(today);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  const calorieBalance = await getCalorieBalance();
 
   const [
     latestMetrics,
@@ -149,6 +153,9 @@ export default async function DashboardPage() {
           delta={muscleDelta}
         />
       </div>
+
+      {/* Calorie Balance */}
+      <CalorieBalanceWidget data={calorieBalance} />
 
       {/* Weight Chart */}
       <div className="rounded-2xl bg-card p-4">

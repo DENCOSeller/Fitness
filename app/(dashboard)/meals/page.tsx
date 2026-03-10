@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useTransition, useRef } from 'react';
-import { createMeal, getMealsByDate, deleteMeal, analyzeMeal } from './actions';
+import { createMeal, getMealsByDate, deleteMeal, analyzeMeal, getDailyCalorieSummary } from './actions';
 
 type Meal = {
   id: number;
@@ -10,6 +10,7 @@ type Meal = {
   description: string | null;
   photoPath: string | null;
   aiAnalysis: string | null;
+  calories: number | null;
   note: string | null;
   createdAt: string;
 };
@@ -49,12 +50,14 @@ export default function MealsPage() {
   const [mealType, setMealType] = useState('breakfast');
   const [description, setDescription] = useState('');
   const [note, setNote] = useState('');
+  const [manualCalories, setManualCalories] = useState('');
   const [photoPath, setPhotoPath] = useState('');
   const [photoPreview, setPhotoPreview] = useState('');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [isPending, startTransition] = useTransition();
   const [analyzingId, setAnalyzingId] = useState<number | null>(null);
+  const [calorieSummary, setCalorieSummary] = useState<{ total: number; count: number; mealsCount: number }>({ total: 0, count: 0, mealsCount: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -62,8 +65,12 @@ export default function MealsPage() {
   }, [selectedDate]);
 
   async function loadMeals() {
-    const list = await getMealsByDate(selectedDate);
+    const [list, summary] = await Promise.all([
+      getMealsByDate(selectedDate),
+      getDailyCalorieSummary(selectedDate),
+    ]);
     setMeals(list as unknown as Meal[]);
+    setCalorieSummary(summary);
   }
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -116,11 +123,13 @@ export default function MealsPage() {
         description: description.trim() || undefined,
         photoPath: photoPath || undefined,
         note: note.trim() || undefined,
+        calories: manualCalories ? parseInt(manualCalories, 10) : undefined,
       });
 
       // Reset form
       setDescription('');
       setNote('');
+      setManualCalories('');
       setPhotoPath('');
       setPhotoPreview('');
       setShowForm(false);
@@ -209,6 +218,27 @@ export default function MealsPage() {
         </button>
       </div>
 
+      {/* Daily calorie summary */}
+      {calorieSummary.total > 0 && (
+        <div className="bg-card rounded-2xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 6.51 6.51 0 007.5 10.5a6.5 6.5 0 006.5-6.5c0-.592-.082-1.166-.238-1.714z" />
+              </svg>
+              <span className="text-sm font-medium">Итого за день</span>
+            </div>
+            <span className="text-lg font-bold text-accent">{calorieSummary.total} ккал</span>
+          </div>
+          {calorieSummary.count < calorieSummary.mealsCount && (
+            <p className="text-xs text-text-secondary mt-2">
+              Калории посчитаны для {calorieSummary.count} из {calorieSummary.mealsCount} приёмов.
+              Используйте «Анализ AI» для остальных.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Error */}
       {error && (
         <div className="bg-danger/15 text-danger rounded-xl px-4 py-3 text-sm">
@@ -250,6 +280,18 @@ export default function MealsPage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Что ели?"
+              className="w-full bg-card-hover rounded-xl px-4 py-3 text-sm text-text placeholder:text-text-secondary border border-border focus:border-accent focus:outline-none"
+            />
+          </div>
+
+          {/* Calories */}
+          <div>
+            <label className="block text-sm text-text-secondary mb-1">Калории (ккал)</label>
+            <input
+              type="number"
+              value={manualCalories}
+              onChange={(e) => setManualCalories(e.target.value)}
+              placeholder="Необязательно — или используйте AI анализ"
               className="w-full bg-card-hover rounded-xl px-4 py-3 text-sm text-text placeholder:text-text-secondary border border-border focus:border-accent focus:outline-none"
             />
           </div>
@@ -357,6 +399,11 @@ export default function MealsPage() {
                     </div>
                     {meal.description && (
                       <p className="text-sm text-text mt-1">{meal.description}</p>
+                    )}
+                    {meal.calories && (
+                      <span className="inline-block text-xs font-medium text-accent bg-accent/10 px-2 py-0.5 rounded-lg mt-1">
+                        {meal.calories} ккал
+                      </span>
                     )}
                     {meal.note && (
                       <p className="text-xs text-text-secondary mt-1">{meal.note}</p>

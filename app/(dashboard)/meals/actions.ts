@@ -14,6 +14,7 @@ export async function createMeal(data: {
   description?: string;
   photoPath?: string;
   note?: string;
+  calories?: number;
 }) {
   const userId = await getCurrentUserId();
   const date = new Date(data.date + 'T00:00:00');
@@ -26,6 +27,7 @@ export async function createMeal(data: {
       description: data.description || null,
       photoPath: data.photoPath || null,
       note: data.note || null,
+      calories: data.calories ?? null,
     },
   });
 }
@@ -54,6 +56,21 @@ export async function deleteMeal(id: number) {
 
   await prisma.meal.delete({ where: { id } });
   return { success: true };
+}
+
+export async function getDailyCalorieSummary(dateStr: string) {
+  const userId = await getCurrentUserId();
+  const date = new Date(dateStr + 'T00:00:00');
+
+  const meals = await prisma.meal.findMany({
+    where: { userId, date },
+    select: { calories: true, mealType: true },
+  });
+
+  const total = meals.reduce((sum, m) => sum + (m.calories ?? 0), 0);
+  const count = meals.filter(m => m.calories !== null).length;
+
+  return { total, count, mealsCount: meals.length };
 }
 
 export async function analyzeMeal(id: number) {
@@ -111,7 +128,10 @@ export async function analyzeMeal(id: number) {
     // Save to DB
     await prisma.meal.update({
       where: { id },
-      data: { aiAnalysis: analysisText },
+      data: {
+        aiAnalysis: analysisText,
+        calories: parsed.calories ? Math.round(parsed.calories) : null,
+      },
     });
 
     return { success: true, analysis: analysisText };

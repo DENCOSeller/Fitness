@@ -130,6 +130,7 @@ model Meal {
   description String?
   photoPath  String?  @map("photo_path")
   aiAnalysis String?  @map("ai_analysis")
+  calories   Int?
   note       String?
   createdAt  DateTime @default(now()) @map("created_at")
 

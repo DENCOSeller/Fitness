@@ -107,6 +107,9 @@ model BodyMetric {
   muscleMass     Float?   @map("muscle_mass")
   bmi            Float?
   waterPct       Float?   @map("water_pct")
+  leanMass       Float?   @map("lean_mass")
+  bmr            Float?
+  metabolicAge   Int?     @map("metabolic_age")
   screenshotPath String?  @map("screenshot_path")
   createdAt      DateTime @default(now()) @map("created_at")
 

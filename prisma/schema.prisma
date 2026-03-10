@@ -25,6 +25,7 @@ model User {
   workoutTemplates WorkoutTemplate[]
   meals            Meal[]
   bodyMetrics      BodyMetric[]
+  bodyMeasurements BodyMeasurement[]
   healthDaily      HealthDaily[]
   healthWorkouts   HealthWorkout[]
   chatMessages     ChatMessage[]
@@ -158,6 +159,27 @@ model BodyMetric {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("body_metrics")
+}
+
+model BodyMeasurement {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  date      DateTime @db.Date
+  neck      Float?
+  chest     Float?
+  waist     Float?
+  belly     Float?
+  hips      Float?
+  glutes    Float?
+  thigh     Float?
+  calf      Float?
+  shoulder  Float?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("body_measurements")
 }
 
 model HealthDaily {

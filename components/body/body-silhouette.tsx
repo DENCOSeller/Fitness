@@ -13,8 +13,13 @@ type Props = {
   onZoneClick: (zone: MeasurementZone) => void;
 };
 
-// Zone dot positions on the body (relative to viewBox 0 0 340 490)
-// Body is centered at x=170. Labels go left or right.
+// Body is centered at x=170 in the coordinate system.
+// viewBox starts at x=-90 to give 90px margin for left labels,
+// total width 520 gives 90px margin on right (520-340-90=90).
+const VB_X = -90;
+const VB_W = 520;
+const VB_H = 490;
+
 const ZONE_POINTS: Record<MeasurementZone, {
   cx: number;
   cy: number;
@@ -42,7 +47,11 @@ function getZoneColor(data: ZoneData): string {
 
 export default function BodySilhouette({ zones, activeZone, onZoneClick }: Props) {
   return (
-    <svg viewBox="0 0 340 490" className="w-full max-w-[340px] mx-auto" style={{ height: 'auto' }}>
+    <svg
+      viewBox={`${VB_X} 0 ${VB_W} ${VB_H}`}
+      className="w-full mx-auto"
+      style={{ height: 'auto', maxWidth: 420 }}
+    >
       {/* Body silhouette — centered at x=170 */}
       {/* Head */}
       <path
@@ -84,9 +93,9 @@ export default function BodySilhouette({ zones, activeZone, onZoneClick }: Props
         const isActive = activeZone === zone;
         const isLeft = pos.labelSide === 'left';
 
-        // Line and text positions
-        const lineEndX = isLeft ? 30 : 310;
-        const textX = isLeft ? 27 : 313;
+        // Labels positioned well inside the widened viewBox
+        const lineEndX = isLeft ? 10 : 330;
+        const textX = isLeft ? 7 : 333;
         const anchor = isLeft ? 'end' : 'start';
 
         return (

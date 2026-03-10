@@ -41,7 +41,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/login") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
-    pathname.startsWith("/api/")
+    pathname.startsWith("/api/") ||
+    pathname === "/manifest.json" ||
+    pathname.startsWith("/icons/")
   ) {
     return NextResponse.next();
   }

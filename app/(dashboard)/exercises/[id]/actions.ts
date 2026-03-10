@@ -1,15 +1,17 @@
 'use server';
 
 import { prisma } from '@/lib/db';
+import { getCurrentUserId } from '@/lib/auth';
 
 export async function getExerciseProgress(id: number) {
+  const userId = await getCurrentUserId();
   const exercise = await prisma.exercise.findUnique({
     where: { id },
     include: {
       workoutSets: {
         include: {
           workout: {
-            select: { id: true, date: true, type: true },
+            select: { id: true, date: true, type: true, userId: true },
           },
         },
         orderBy: { workout: { date: 'desc' } },
@@ -17,11 +19,11 @@ export async function getExerciseProgress(id: number) {
     },
   });
 
-  if (!exercise) {
+  if (!exercise || exercise.userId !== userId) {
     return { error: 'Упражнение не найдено' };
   }
 
-  // Group sets by workout
+  // Group sets by workout (only user's workouts)
   const workoutMap = new Map<
     number,
     {
@@ -33,6 +35,7 @@ export async function getExerciseProgress(id: number) {
   >();
 
   for (const set of exercise.workoutSets) {
+    if (set.workout.userId !== userId) continue;
     const wId = set.workout.id;
     if (!workoutMap.has(wId)) {
       workoutMap.set(wId, {

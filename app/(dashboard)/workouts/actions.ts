@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/db';
+import { getCurrentUserId } from '@/lib/auth';
 
 export async function createWorkout(data: {
   date: string;
@@ -12,6 +13,7 @@ export async function createWorkout(data: {
     sets: { reps: number; weight: number }[];
   }[];
 }) {
+  const userId = await getCurrentUserId();
   const { date, type, durationMin, note, exercises } = data;
 
   if (!type.trim()) {
@@ -30,6 +32,7 @@ export async function createWorkout(data: {
 
   const workout = await prisma.workout.create({
     data: {
+      userId,
       date: new Date(date),
       type: type.trim(),
       durationMin: durationMin || null,
@@ -51,6 +54,7 @@ export async function createWorkout(data: {
 }
 
 export async function getWorkout(id: number) {
+  const userId = await getCurrentUserId();
   const workout = await prisma.workout.findUnique({
     where: { id },
     include: {
@@ -61,7 +65,7 @@ export async function getWorkout(id: number) {
     },
   });
 
-  if (!workout) {
+  if (!workout || workout.userId !== userId) {
     return { error: 'Тренировка не найдена' };
   }
 
@@ -69,7 +73,9 @@ export async function getWorkout(id: number) {
 }
 
 export async function listWorkouts() {
+  const userId = await getCurrentUserId();
   const workouts = await prisma.workout.findMany({
+    where: { userId },
     orderBy: { date: 'desc' },
     include: {
       sets: {
@@ -83,11 +89,18 @@ export async function listWorkouts() {
 }
 
 export async function deleteWorkout(id: number) {
+  const userId = await getCurrentUserId();
+  const workout = await prisma.workout.findUnique({ where: { id } });
+  if (!workout || workout.userId !== userId) {
+    return { error: 'Тренировка не найдена' };
+  }
+
   await prisma.workout.delete({ where: { id } });
   return { success: true };
 }
 
 export async function createExerciseFromWorkout(data: { name: string; muscleGroup: string }) {
+  const userId = await getCurrentUserId();
   const name = data.name.trim();
   const muscleGroup = data.muscleGroup.trim();
 
@@ -96,7 +109,7 @@ export async function createExerciseFromWorkout(data: { name: string; muscleGrou
   }
 
   const existing = await prisma.exercise.findFirst({
-    where: { name: { equals: name, mode: 'insensitive' } },
+    where: { userId, name: { equals: name, mode: 'insensitive' } },
   });
 
   if (existing) {
@@ -104,7 +117,7 @@ export async function createExerciseFromWorkout(data: { name: string; muscleGrou
   }
 
   const exercise = await prisma.exercise.create({
-    data: { name, muscleGroup },
+    data: { userId, name, muscleGroup },
   });
 
   return { exercise };

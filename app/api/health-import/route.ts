@@ -3,15 +3,18 @@ import AdmZip from 'adm-zip';
 import { Readable } from 'stream';
 import { parseAppleHealthXml, type ImportResult } from '@/lib/health-import';
 import { prisma } from '@/lib/db';
-
-export const config = {
-  api: { bodyParser: false },
-};
+import { getSessionUserId } from '@/lib/auth';
 
 const MAX_ZIP_SIZE = 1024 * 1024 * 1024; // 1 GB
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const userId = await getSessionUserId();
+    if (!userId) {
+      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 
@@ -44,7 +47,7 @@ export async function POST(request: NextRequest) {
     const result = await parseAppleHealthXml(xmlStream);
 
     // Save to DB
-    const counts = await saveToDatabase(result);
+    const counts = await saveToDatabase(result, userId);
 
     return NextResponse.json({
       success: true,
@@ -78,7 +81,7 @@ function extractExportXml(buffer: Buffer): Readable | null {
   return Readable.from(xmlBuffer);
 }
 
-async function saveToDatabase(result: ImportResult) {
+async function saveToDatabase(result: ImportResult, userId: number) {
   let dailyCount = 0;
   let workoutCount = 0;
 
@@ -104,8 +107,9 @@ async function saveToDatabase(result: ImportResult) {
             : null;
 
         return prisma.healthDaily.upsert({
-          where: { date },
+          where: { userId_date: { userId, date } },
           create: {
+            userId,
             date,
             steps: data.steps || null,
             activeCalories: data.activeCalories || null,
@@ -124,10 +128,10 @@ async function saveToDatabase(result: ImportResult) {
     dailyCount += batch.length;
   }
 
-  // Insert workouts (delete existing health workouts first to avoid duplicates)
+  // Insert workouts (delete existing health workouts for this user first)
   if (result.workouts.length > 0) {
     await prisma.healthWorkout.deleteMany({
-      where: { source: { not: null } },
+      where: { userId, source: { not: null } },
     });
 
     // Insert in batches
@@ -135,6 +139,7 @@ async function saveToDatabase(result: ImportResult) {
       const batch = result.workouts.slice(i, i + 100);
       await prisma.healthWorkout.createMany({
         data: batch.map((w) => ({
+          userId,
           date: new Date(w.date + 'T00:00:00.000Z'),
           type: w.type,
           durationMin: w.durationMin || null,

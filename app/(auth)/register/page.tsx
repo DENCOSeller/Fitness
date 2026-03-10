@@ -1,12 +1,12 @@
 "use client";
 
 import { useActionState } from "react";
-import { loginAction } from "./actions";
+import { registerAction } from "./actions";
 import Logo from "@/components/ui/logo";
 import Link from "next/link";
 
-export default function LoginPage() {
-  const [state, formAction, isPending] = useActionState(loginAction, null);
+export default function RegisterPage() {
+  const [state, formAction, isPending] = useActionState(registerAction, null);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-bg p-6">
@@ -14,7 +14,26 @@ export default function LoginPage() {
         <div className="mb-8 flex justify-center">
           <Logo size="large" />
         </div>
+        <h1 className="mb-6 text-center text-xl font-bold text-text">
+          Регистрация
+        </h1>
         <form action={formAction} className="space-y-4">
+          <div>
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-text-secondary"
+            >
+              Имя (необязательно)
+            </label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              autoComplete="name"
+              className="mt-1 block w-full rounded-xl border border-border bg-card px-4 py-3 text-text placeholder-text-secondary shadow-none transition-colors duration-200 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              placeholder="Как вас зовут?"
+            />
+          </div>
           <div>
             <label
               htmlFor="email"
@@ -43,9 +62,11 @@ export default function LoginPage() {
               id="password"
               name="password"
               type="password"
-              autoComplete="current-password"
+              autoComplete="new-password"
               required
+              minLength={4}
               className="mt-1 block w-full rounded-xl border border-border bg-card px-4 py-3 text-text placeholder-text-secondary shadow-none transition-colors duration-200 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              placeholder="Минимум 4 символа"
             />
           </div>
           {state?.error && (
@@ -56,13 +77,13 @@ export default function LoginPage() {
             disabled={isPending}
             className="w-full rounded-xl bg-accent px-4 py-3 text-base font-semibold text-white transition-all duration-200 hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg disabled:opacity-40"
           >
-            {isPending ? "Вход..." : "Войти"}
+            {isPending ? "Регистрация..." : "Зарегистрироваться"}
           </button>
         </form>
         <p className="mt-6 text-center text-sm text-text-secondary">
-          Нет аккаунта?{" "}
-          <Link href="/register" className="text-accent hover:underline">
-            Зарегистрироваться
+          Уже есть аккаунт?{" "}
+          <Link href="/login" className="text-accent hover:underline">
+            Войти
           </Link>
         </p>
       </div>

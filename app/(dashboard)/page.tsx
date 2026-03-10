@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { getCurrentUserId } from '@/lib/auth';
 import Link from 'next/link';
 
 function formatDate(date: Date): string {
@@ -29,6 +30,7 @@ const workoutTypeLabels: Record<string, string> = {
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
+  const userId = await getCurrentUserId();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -41,21 +43,25 @@ export default async function DashboardPage() {
     weightHistory,
     lastWorkout,
     todayCheckin,
+    user,
   ] = await Promise.all([
     prisma.bodyMetric.findFirst({
+      where: { userId },
       orderBy: { date: 'desc' },
     }),
     prisma.bodyMetric.findMany({
+      where: { userId },
       orderBy: { date: 'desc' },
       skip: 1,
       take: 1,
     }),
     prisma.bodyMetric.findMany({
-      where: { date: { gte: thirtyDaysAgo }, weight: { not: null } },
+      where: { userId, date: { gte: thirtyDaysAgo }, weight: { not: null } },
       orderBy: { date: 'asc' },
       select: { date: true, weight: true },
     }),
     prisma.workout.findFirst({
+      where: { userId },
       orderBy: { date: 'desc' },
       include: {
         sets: {
@@ -65,7 +71,11 @@ export default async function DashboardPage() {
       },
     }),
     prisma.checkIn.findFirst({
-      where: { date: today },
+      where: { userId, date: today },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true },
     }),
   ]);
 
@@ -112,7 +122,7 @@ export default async function DashboardPage() {
     <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-4">
       {/* Greeting */}
       <div className="pt-1 pb-2">
-        <h1 className="text-2xl font-bold">Привет, Даниил!</h1>
+        <h1 className="text-2xl font-bold">Привет{user?.name ? `, ${user.name}` : ''}!</h1>
         <p className="text-text-secondary text-sm mt-0.5 capitalize">{formatDate(new Date())}</p>
       </div>
 

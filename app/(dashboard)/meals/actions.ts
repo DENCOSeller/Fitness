@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/db';
+import { getCurrentUserId } from '@/lib/auth';
 import { deleteImage } from '@/lib/upload';
 import { askClaudeVision } from '@/lib/claude';
 import { buildMealAnalysisPrompt } from '@/lib/ai-prompts';
@@ -14,10 +15,12 @@ export async function createMeal(data: {
   photoPath?: string;
   note?: string;
 }) {
+  const userId = await getCurrentUserId();
   const date = new Date(data.date + 'T00:00:00');
 
   return prisma.meal.create({
     data: {
+      userId,
       date,
       mealType: data.mealType,
       description: data.description || null,
@@ -28,17 +31,19 @@ export async function createMeal(data: {
 }
 
 export async function getMealsByDate(dateStr: string) {
+  const userId = await getCurrentUserId();
   const date = new Date(dateStr + 'T00:00:00');
 
   return prisma.meal.findMany({
-    where: { date },
+    where: { userId, date },
     orderBy: { createdAt: 'desc' },
   });
 }
 
 export async function deleteMeal(id: number) {
+  const userId = await getCurrentUserId();
   const meal = await prisma.meal.findUnique({ where: { id } });
-  if (!meal) {
+  if (!meal || meal.userId !== userId) {
     return { error: 'Приём пищи не найден' };
   }
 
@@ -52,8 +57,9 @@ export async function deleteMeal(id: number) {
 }
 
 export async function analyzeMeal(id: number) {
+  const userId = await getCurrentUserId();
   const meal = await prisma.meal.findUnique({ where: { id } });
-  if (!meal) {
+  if (!meal || meal.userId !== userId) {
     return { error: 'Приём пищи не найден' };
   }
   if (!meal.photoPath) {
@@ -61,7 +67,7 @@ export async function analyzeMeal(id: number) {
   }
 
   // Read photo from disk and convert to base64
-  const fullPath = path.join(process.cwd(), 'public', meal.photoPath);
+  const fullPath = path.join('/root/Fitness', 'public', meal.photoPath);
   let imageBuffer: Buffer;
   try {
     imageBuffer = await fs.readFile(fullPath);

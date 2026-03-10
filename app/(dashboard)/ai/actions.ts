@@ -1,16 +1,18 @@
 'use server';
 
 import { prisma } from '@/lib/db';
+import { getCurrentUserId } from '@/lib/auth';
 import { askClaude } from '@/lib/claude';
 import { buildDailyPrompt, buildWeeklyPrompt, type DailyContext, type WeeklyContext } from '@/lib/ai-prompts';
 
 export async function getDailyInsight() {
+  const userId = await getCurrentUserId();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   // Check cache
   const cached = await prisma.aiInsight.findFirst({
-    where: { date: today, type: 'daily' },
+    where: { userId, date: today, type: 'daily' },
   });
 
   if (cached) {
@@ -26,12 +28,13 @@ export async function getDailyInsight() {
 }
 
 export async function generateDailyInsight() {
+  const userId = await getCurrentUserId();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   // Double-check cache
   const cached = await prisma.aiInsight.findFirst({
-    where: { date: today, type: 'daily' },
+    where: { userId, date: today, type: 'daily' },
   });
   if (cached) {
     return {
@@ -49,11 +52,11 @@ export async function generateDailyInsight() {
 
   const [checkIns, workouts, body, meals, health] = await Promise.all([
     prisma.checkIn.findMany({
-      where: { date: { gte: since } },
+      where: { userId, date: { gte: since } },
       orderBy: { date: 'desc' },
     }),
     prisma.workout.findMany({
-      where: { date: { gte: since } },
+      where: { userId, date: { gte: since } },
       orderBy: { date: 'desc' },
       include: {
         sets: {
@@ -62,15 +65,15 @@ export async function generateDailyInsight() {
       },
     }),
     prisma.bodyMetric.findMany({
-      where: { date: { gte: since } },
+      where: { userId, date: { gte: since } },
       orderBy: { date: 'desc' },
     }),
     prisma.meal.findMany({
-      where: { date: { gte: since } },
+      where: { userId, date: { gte: since } },
       orderBy: { date: 'desc' },
     }),
     prisma.healthDaily.findMany({
-      where: { date: { gte: since } },
+      where: { userId, date: { gte: since } },
       orderBy: { date: 'desc' },
     }),
   ]);
@@ -123,6 +126,7 @@ export async function generateDailyInsight() {
 
     const saved = await prisma.aiInsight.create({
       data: {
+        userId,
         date: today,
         type: 'daily',
         model: 'claude-sonnet-4-6',
@@ -143,6 +147,7 @@ export async function generateDailyInsight() {
 }
 
 export async function getWeeklyReport() {
+  const userId = await getCurrentUserId();
   // Weekly report is cached for 7 days
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
@@ -150,6 +155,7 @@ export async function getWeeklyReport() {
 
   const cached = await prisma.aiInsight.findFirst({
     where: {
+      userId,
       type: 'weekly',
       createdAt: { gte: weekAgo },
     },
@@ -170,6 +176,7 @@ export async function getWeeklyReport() {
 }
 
 export async function generateWeeklyReport() {
+  const userId = await getCurrentUserId();
   // Check cache (7 days)
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
@@ -177,6 +184,7 @@ export async function generateWeeklyReport() {
 
   const cached = await prisma.aiInsight.findFirst({
     where: {
+      userId,
       type: 'weekly',
       createdAt: { gte: weekAgo },
     },
@@ -200,11 +208,11 @@ export async function generateWeeklyReport() {
 
   const [checkIns, workouts, body, meals, health] = await Promise.all([
     prisma.checkIn.findMany({
-      where: { date: { gte: since } },
+      where: { userId, date: { gte: since } },
       orderBy: { date: 'asc' },
     }),
     prisma.workout.findMany({
-      where: { date: { gte: since } },
+      where: { userId, date: { gte: since } },
       orderBy: { date: 'asc' },
       include: {
         sets: {
@@ -213,15 +221,15 @@ export async function generateWeeklyReport() {
       },
     }),
     prisma.bodyMetric.findMany({
-      where: { date: { gte: since } },
+      where: { userId, date: { gte: since } },
       orderBy: { date: 'asc' },
     }),
     prisma.meal.findMany({
-      where: { date: { gte: since } },
+      where: { userId, date: { gte: since } },
       orderBy: { date: 'asc' },
     }),
     prisma.healthDaily.findMany({
-      where: { date: { gte: since } },
+      where: { userId, date: { gte: since } },
       orderBy: { date: 'asc' },
     }),
   ]);
@@ -276,6 +284,7 @@ export async function generateWeeklyReport() {
 
     const saved = await prisma.aiInsight.create({
       data: {
+        userId,
         date: today,
         type: 'weekly',
         model: 'claude-opus-4-6',
@@ -297,8 +306,9 @@ export async function generateWeeklyReport() {
 }
 
 export async function getInsightHistory(limit = 30, type?: string) {
+  const userId = await getCurrentUserId();
   return prisma.aiInsight.findMany({
-    where: type ? { type } : undefined,
+    where: { userId, ...(type ? { type } : {}) },
     orderBy: { date: 'desc' },
     take: limit,
   });

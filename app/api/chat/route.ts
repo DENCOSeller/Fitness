@@ -1,16 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { buildTrainerSystemPrompt, getChatHistory, saveChatMessage } from '@/lib/ai-trainer';
-import { cookies } from 'next/headers';
+import { getSessionUserId } from '@/lib/auth';
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 export async function POST(request: Request) {
-  // Auth check
-  const cookieStore = await cookies();
-  const session = cookieStore.get('session');
-  if (!session) {
+  // Auth check — get userId from session
+  const userId = await getSessionUserId();
+  if (!userId) {
     return new Response('Unauthorized', { status: 401 });
   }
 
@@ -21,13 +20,13 @@ export async function POST(request: Request) {
   }
 
   // Save user message
-  await saveChatMessage(sessionId, 'user', message);
+  await saveChatMessage(sessionId, 'user', message, userId);
 
   // Build system prompt with full user context
-  const systemPrompt = await buildTrainerSystemPrompt();
+  const systemPrompt = await buildTrainerSystemPrompt(userId);
 
   // Load chat history for context
-  const history = await getChatHistory(sessionId);
+  const history = await getChatHistory(sessionId, userId);
   const messages: Anthropic.MessageParam[] = history.map(m => ({
     role: m.role as 'user' | 'assistant',
     content: m.content,
@@ -56,7 +55,7 @@ export async function POST(request: Request) {
         }
 
         // Save assistant response after streaming is complete
-        await saveChatMessage(sessionId, 'assistant', fullResponse);
+        await saveChatMessage(sessionId, 'assistant', fullResponse, userId);
 
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
         controller.close();

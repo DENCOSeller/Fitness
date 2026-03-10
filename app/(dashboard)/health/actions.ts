@@ -1,9 +1,12 @@
 'use server';
 
 import { prisma } from '@/lib/db';
+import { getCurrentUserId } from '@/lib/auth';
 
 export async function getHealthDaily(limit: number = 90) {
+  const userId = await getCurrentUserId();
   const records = await prisma.healthDaily.findMany({
+    where: { userId },
     orderBy: { date: 'desc' },
     take: limit,
   });
@@ -19,7 +22,9 @@ export async function getHealthDaily(limit: number = 90) {
 }
 
 export async function getHealthWorkouts(limit: number = 50) {
+  const userId = await getCurrentUserId();
   const workouts = await prisma.healthWorkout.findMany({
+    where: { userId },
     orderBy: { date: 'desc' },
     take: limit,
   });
@@ -35,6 +40,7 @@ export async function getHealthWorkouts(limit: number = 50) {
 }
 
 export async function getHealthDailyByPeriod(period: 'week' | 'month' | '3months' | 'year') {
+  const userId = await getCurrentUserId();
   const now = new Date();
   const from = new Date();
   switch (period) {
@@ -45,7 +51,7 @@ export async function getHealthDailyByPeriod(period: 'week' | 'month' | '3months
   }
 
   const records = await prisma.healthDaily.findMany({
-    where: { date: { gte: from } },
+    where: { userId, date: { gte: from } },
     orderBy: { date: 'asc' },
   });
 
@@ -59,14 +65,17 @@ export async function getHealthDailyByPeriod(period: 'week' | 'month' | '3months
 }
 
 export async function getHealthStats() {
-  const totalDaily = await prisma.healthDaily.count();
-  const totalWorkouts = await prisma.healthWorkout.count();
+  const userId = await getCurrentUserId();
+  const totalDaily = await prisma.healthDaily.count({ where: { userId } });
+  const totalWorkouts = await prisma.healthWorkout.count({ where: { userId } });
 
   const latest = await prisma.healthDaily.findFirst({
+    where: { userId },
     orderBy: { date: 'desc' },
   });
 
   const earliest = await prisma.healthDaily.findFirst({
+    where: { userId },
     orderBy: { date: 'asc' },
   });
 

@@ -1,9 +1,12 @@
 'use server';
 
 import { prisma } from '@/lib/db';
+import { getCurrentUserId } from '@/lib/auth';
 
 export async function getExercises() {
+  const userId = await getCurrentUserId();
   return prisma.exercise.findMany({
+    where: { userId },
     orderBy: { name: 'asc' },
     include: {
       _count: {
@@ -14,6 +17,7 @@ export async function getExercises() {
 }
 
 export async function createExercise(data: { name: string; muscleGroup: string }) {
+  const userId = await getCurrentUserId();
   const name = data.name.trim();
   const muscleGroup = data.muscleGroup.trim();
 
@@ -22,7 +26,7 @@ export async function createExercise(data: { name: string; muscleGroup: string }
   }
 
   const existing = await prisma.exercise.findFirst({
-    where: { name: { equals: name, mode: 'insensitive' } },
+    where: { userId, name: { equals: name, mode: 'insensitive' } },
   });
 
   if (existing) {
@@ -30,13 +34,14 @@ export async function createExercise(data: { name: string; muscleGroup: string }
   }
 
   await prisma.exercise.create({
-    data: { name, muscleGroup },
+    data: { userId, name, muscleGroup },
   });
 
   return { success: true };
 }
 
 export async function deleteExercise(id: number) {
+  const userId = await getCurrentUserId();
   const exercise = await prisma.exercise.findUnique({
     where: { id },
     include: {
@@ -46,7 +51,7 @@ export async function deleteExercise(id: number) {
     },
   });
 
-  if (!exercise) {
+  if (!exercise || exercise.userId !== userId) {
     return { error: 'Упражнение не найдено' };
   }
 

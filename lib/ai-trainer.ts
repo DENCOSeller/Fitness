@@ -1,8 +1,10 @@
 'use server';
 
 import { prisma } from '@/lib/db';
+import { getCurrentUserId } from '@/lib/auth';
 
-export async function buildTrainerSystemPrompt(): Promise<string> {
+export async function buildTrainerSystemPrompt(userId?: number): Promise<string> {
+  const uid = userId ?? await getCurrentUserId();
   const now = new Date();
   const thirtyDaysAgo = new Date(now);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -12,27 +14,28 @@ export async function buildTrainerSystemPrompt(): Promise<string> {
   // Fetch all user data in parallel
   const [checkIns, workouts, meals, bodyMetrics, healthDaily] = await Promise.all([
     prisma.checkIn.findMany({
-      where: { date: { gte: thirtyDaysAgo } },
+      where: { userId: uid, date: { gte: thirtyDaysAgo } },
       orderBy: { date: 'desc' },
       take: 30,
     }),
     prisma.workout.findMany({
-      where: { date: { gte: thirtyDaysAgo } },
+      where: { userId: uid, date: { gte: thirtyDaysAgo } },
       orderBy: { date: 'desc' },
       include: { sets: { include: { exercise: true } } },
       take: 20,
     }),
     prisma.meal.findMany({
-      where: { date: { gte: sevenDaysAgo } },
+      where: { userId: uid, date: { gte: sevenDaysAgo } },
       orderBy: { date: 'desc' },
       take: 30,
     }),
     prisma.bodyMetric.findMany({
+      where: { userId: uid },
       orderBy: { date: 'desc' },
       take: 10,
     }),
     prisma.healthDaily.findMany({
-      where: { date: { gte: thirtyDaysAgo } },
+      where: { userId: uid, date: { gte: thirtyDaysAgo } },
       orderBy: { date: 'desc' },
       take: 30,
     }),
@@ -131,30 +134,34 @@ export async function buildTrainerSystemPrompt(): Promise<string> {
 ${context}`;
 }
 
-export async function getChatHistory(sessionId: string) {
+export async function getChatHistory(sessionId: string, userId?: number) {
+  const uid = userId ?? await getCurrentUserId();
   return prisma.chatMessage.findMany({
-    where: { sessionId },
+    where: { userId: uid, sessionId },
     orderBy: { createdAt: 'asc' },
     select: { id: true, role: true, content: true, createdAt: true },
   });
 }
 
-export async function saveChatMessage(sessionId: string, role: string, content: string) {
+export async function saveChatMessage(sessionId: string, role: string, content: string, userId?: number) {
+  const uid = userId ?? await getCurrentUserId();
   return prisma.chatMessage.create({
-    data: { sessionId, role, content },
+    data: { userId: uid, sessionId, role, content },
   });
 }
 
-export async function getChatSessions() {
+export async function getChatSessions(userId?: number) {
+  const uid = userId ?? await getCurrentUserId();
   // Get distinct sessions with their first message and message count
   const sessions = await prisma.$queryRaw<
     { session_id: string; first_message: string; created_at: Date; message_count: bigint }[]
   >`
     SELECT session_id,
-           (SELECT content FROM chat_messages cm2 WHERE cm2.session_id = cm.session_id AND cm2.role = 'user' ORDER BY created_at ASC LIMIT 1) as first_message,
+           (SELECT content FROM chat_messages cm2 WHERE cm2.session_id = cm.session_id AND cm2.role = 'user' AND cm2.user_id = ${uid} ORDER BY created_at ASC LIMIT 1) as first_message,
            MIN(created_at) as created_at,
            COUNT(*) as message_count
     FROM chat_messages cm
+    WHERE cm.user_id = ${uid}
     GROUP BY session_id
     ORDER BY MAX(created_at) DESC
     LIMIT 20
@@ -168,6 +175,7 @@ export async function getChatSessions() {
   }));
 }
 
-export async function deleteChatSession(sessionId: string) {
-  await prisma.chatMessage.deleteMany({ where: { sessionId } });
+export async function deleteChatSession(sessionId: string, userId?: number) {
+  const uid = userId ?? await getCurrentUserId();
+  await prisma.chatMessage.deleteMany({ where: { userId: uid, sessionId } });
 }

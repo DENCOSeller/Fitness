@@ -7,9 +7,32 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  checkIns         CheckIn[]
+  exercises        Exercise[]
+  workouts         Workout[]
+  workoutTemplates WorkoutTemplate[]
+  meals            Meal[]
+  bodyMetrics      BodyMetric[]
+  healthDaily      HealthDaily[]
+  healthWorkouts   HealthWorkout[]
+  chatMessages     ChatMessage[]
+  progressPhotos   ProgressPhoto[]
+  aiInsights       AiInsight[]
+
+  @@map("users")
+}
+
 model CheckIn {
   id        Int      @id @default(autoincrement())
-  date      DateTime @unique @db.Date
+  userId    Int      @map("user_id")
+  date      DateTime @db.Date
   wellbeing Int
   sleep     Int
   stress    Int
@@ -18,15 +41,20 @@ model CheckIn {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
   @@map("check_ins")
 }
 
 model Exercise {
   id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
   name        String
   muscleGroup String   @map("muscle_group")
   createdAt   DateTime @default(now()) @map("created_at")
 
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   workoutSets       WorkoutSet[]
   templateExercises TemplateExercise[]
 
@@ -35,12 +63,14 @@ model Exercise {
 
 model Workout {
   id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
   date        DateTime @db.Date
   type        String
   durationMin Int?     @map("duration_min")
   note        String?
   createdAt   DateTime @default(now()) @map("created_at")
 
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   sets WorkoutSet[]
 
   @@map("workouts")
@@ -63,9 +93,11 @@ model WorkoutSet {
 
 model WorkoutTemplate {
   id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
   name      String
   createdAt DateTime @default(now()) @map("created_at")
 
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   exercises TemplateExercise[]
 
   @@map("workout_templates")
@@ -88,6 +120,7 @@ model TemplateExercise {
 
 model Meal {
   id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
   date       DateTime @db.Date
   mealType   String   @map("meal_type")
   description String?
@@ -96,11 +129,14 @@ model Meal {
   note       String?
   createdAt  DateTime @default(now()) @map("created_at")
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("meals")
 }
 
 model BodyMetric {
   id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
   date           DateTime @db.Date
   weight         Float?
   bodyFatPct     Float?   @map("body_fat_pct")
@@ -113,12 +149,15 @@ model BodyMetric {
   screenshotPath String?  @map("screenshot_path")
   createdAt      DateTime @default(now()) @map("created_at")
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("body_metrics")
 }
 
 model HealthDaily {
   id             Int      @id @default(autoincrement())
-  date           DateTime @unique @db.Date
+  userId         Int      @map("user_id")
+  date           DateTime @db.Date
   steps          Int?
   activeCalories Int?     @map("active_calories")
   restingHr      Int?     @map("resting_hr")
@@ -126,11 +165,15 @@ model HealthDaily {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
   @@map("health_daily")
 }
 
 model HealthWorkout {
   id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
   date        DateTime @db.Date
   type        String
   durationMin Int?     @map("duration_min")
@@ -138,32 +181,42 @@ model HealthWorkout {
   source      String?
   createdAt   DateTime @default(now()) @map("created_at")
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("health_workouts")
 }
 
 model ChatMessage {
   id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
   sessionId String   @map("session_id")
   role      String   // user | assistant
   content   String
   createdAt DateTime @default(now()) @map("created_at")
 
-  @@index([sessionId])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sessionId])
   @@map("chat_messages")
 }
 
 model ProgressPhoto {
   id         Int      @id @default(autoincrement())
-  date       DateTime @unique @db.Date
+  userId     Int      @map("user_id")
+  date       DateTime @db.Date
   photoPath  String   @map("photo_path")
   aiAnalysis String?  @map("ai_analysis")
   createdAt  DateTime @default(now()) @map("created_at")
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
   @@map("progress_photos")
 }
 
 model AiInsight {
   id               Int      @id @default(autoincrement())
+  userId           Int      @map("user_id")
   date             DateTime @db.Date
   type             String
   model            String
@@ -171,6 +224,8 @@ model AiInsight {
   completionTokens Int?     @map("completion_tokens")
   content          String
   createdAt        DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("ai_insights")
 }

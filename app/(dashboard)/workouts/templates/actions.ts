@@ -1,8 +1,10 @@
 'use server';
 
 import { prisma } from '@/lib/db';
+import { getCurrentUserId } from '@/lib/auth';
 
 export async function createTemplateFromWorkout(workoutId: number, name: string) {
+  const userId = await getCurrentUserId();
   const trimmed = name.trim();
   if (!trimmed) {
     return { error: 'Введите название шаблона' };
@@ -18,7 +20,7 @@ export async function createTemplateFromWorkout(workoutId: number, name: string)
     },
   });
 
-  if (!workout) {
+  if (!workout || workout.userId !== userId) {
     return { error: 'Тренировка не найдена' };
   }
 
@@ -39,6 +41,7 @@ export async function createTemplateFromWorkout(workoutId: number, name: string)
 
   const template = await prisma.workoutTemplate.create({
     data: {
+      userId,
       name: trimmed,
       exercises: {
         create: exerciseGroups.map((group, idx) => ({
@@ -56,7 +59,9 @@ export async function createTemplateFromWorkout(workoutId: number, name: string)
 }
 
 export async function listTemplates() {
+  const userId = await getCurrentUserId();
   const templates = await prisma.workoutTemplate.findMany({
+    where: { userId },
     orderBy: { createdAt: 'desc' },
     include: {
       exercises: {
@@ -70,6 +75,7 @@ export async function listTemplates() {
 }
 
 export async function getTemplate(id: number) {
+  const userId = await getCurrentUserId();
   const template = await prisma.workoutTemplate.findUnique({
     where: { id },
     include: {
@@ -80,7 +86,7 @@ export async function getTemplate(id: number) {
     },
   });
 
-  if (!template) {
+  if (!template || template.userId !== userId) {
     return { error: 'Шаблон не найден' };
   }
 
@@ -88,6 +94,12 @@ export async function getTemplate(id: number) {
 }
 
 export async function deleteTemplate(id: number) {
+  const userId = await getCurrentUserId();
+  const template = await prisma.workoutTemplate.findUnique({ where: { id } });
+  if (!template || template.userId !== userId) {
+    return { error: 'Шаблон не найден' };
+  }
+
   await prisma.workoutTemplate.delete({ where: { id } });
   return { success: true };
 }

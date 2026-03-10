@@ -21,7 +21,9 @@ export async function saveAndCompressImage(
   const outputPath = path.join(dir, filename);
 
   let quality = 85;
+  // .rotate() auto-corrects EXIF orientation (iPhone photos)
   let output = await sharp(buffer)
+    .rotate()
     .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
     .jpeg({ quality })
     .toBuffer();
@@ -30,6 +32,7 @@ export async function saveAndCompressImage(
   while (output.length > MAX_SIZE_KB * 1024 && quality > 20) {
     quality -= 10;
     output = await sharp(buffer)
+      .rotate()
       .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality })
       .toBuffer();

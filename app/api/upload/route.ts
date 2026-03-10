@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { saveAndCompressImage, generateFilename } from '@/lib/upload';
+import { getSessionUserId } from '@/lib/auth';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 const MAX_UPLOAD_SIZE = 20 * 1024 * 1024; // 20MB raw upload limit
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const userId = await getSessionUserId();
+    if (!userId) {
+      return NextResponse.json({ error: 'Не авторизован' }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const subdir = (formData.get('subdir') as string) || 'meals';
@@ -14,7 +21,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Файл не выбран' }, { status: 400 });
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    // Allow image/* types + application/octet-stream (iPhone sometimes sends this)
+    const isImage = file.type.startsWith('image/') || ALLOWED_TYPES.includes(file.type);
+    const isOctetStream = file.type === 'application/octet-stream' || file.type === '';
+    if (!isImage && !isOctetStream) {
       return NextResponse.json({ error: 'Поддерживаются только изображения (JPEG, PNG, WebP, HEIC)' }, { status: 400 });
     }
 

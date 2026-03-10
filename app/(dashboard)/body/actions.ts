@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/db';
+import { getCurrentUserId } from '@/lib/auth';
 import { askClaudeVision } from '@/lib/claude';
 import { PICOOC_PARSE_PROMPT, validatePicoocData } from '@/lib/picooc-prompt';
 import type { PicoocData } from '@/lib/picooc-prompt';
@@ -50,6 +51,7 @@ export async function saveBodyMetric(data: {
   metabolicAge: number | null;
   screenshotPath: string | null;
 }) {
+  const userId = await getCurrentUserId();
   const date = new Date(data.date + 'T00:00:00');
 
   const metricData = {
@@ -63,9 +65,9 @@ export async function saveBodyMetric(data: {
     metabolicAge: data.metabolicAge,
   };
 
-  // Check if metric exists for this date
+  // Check if metric exists for this date and user
   const existing = await prisma.bodyMetric.findFirst({
-    where: { date },
+    where: { userId, date },
   });
 
   if (existing) {
@@ -85,6 +87,7 @@ export async function saveBodyMetric(data: {
 
   return prisma.bodyMetric.create({
     data: {
+      userId,
       date,
       ...metricData,
       screenshotPath: data.screenshotPath,
@@ -93,15 +96,18 @@ export async function saveBodyMetric(data: {
 }
 
 export async function getBodyMetrics(limit = 90) {
+  const userId = await getCurrentUserId();
   return prisma.bodyMetric.findMany({
+    where: { userId },
     orderBy: { date: 'desc' },
     take: limit,
   });
 }
 
 export async function deleteBodyMetric(id: number) {
+  const userId = await getCurrentUserId();
   const metric = await prisma.bodyMetric.findUnique({ where: { id } });
-  if (!metric) {
+  if (!metric || metric.userId !== userId) {
     return { error: 'Замер не найден' };
   }
 
@@ -114,8 +120,15 @@ export async function deleteBodyMetric(id: number) {
 }
 
 export async function getImageBase64(relativePath: string): Promise<{ base64: string; mediaType: string } | null> {
+  await getCurrentUserId();
+
+  // Prevent path traversal
+  if (!relativePath.startsWith('/uploads/') || relativePath.includes('..')) {
+    return null;
+  }
+
   try {
-    const fullPath = path.join(process.cwd(), 'public', relativePath);
+    const fullPath = path.join('/root/Fitness', 'public', relativePath);
     const buffer = await fs.readFile(fullPath);
     const base64 = buffer.toString('base64');
     const ext = path.extname(relativePath).toLowerCase();

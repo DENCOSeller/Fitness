@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/db';
+import { getCurrentUserId } from '@/lib/auth';
 
 export async function upsertCheckIn(data: {
   wellbeing: number;
@@ -9,12 +10,14 @@ export async function upsertCheckIn(data: {
   energy: number;
   note: string;
 }) {
+  const userId = await getCurrentUserId();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   return prisma.checkIn.upsert({
-    where: { date: today },
+    where: { userId_date: { userId, date: today } },
     create: {
+      userId,
       date: today,
       wellbeing: data.wellbeing,
       sleep: data.sleep,
@@ -33,21 +36,23 @@ export async function upsertCheckIn(data: {
 }
 
 export async function getTodayCheckIn() {
+  const userId = await getCurrentUserId();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   return prisma.checkIn.findUnique({
-    where: { date: today },
+    where: { userId_date: { userId, date: today } },
   });
 }
 
 export async function getCheckIns(days: number = 30) {
+  const userId = await getCurrentUserId();
   const since = new Date();
   since.setDate(since.getDate() - days);
   since.setHours(0, 0, 0, 0);
 
   return prisma.checkIn.findMany({
-    where: { date: { gte: since } },
+    where: { userId, date: { gte: since } },
     orderBy: { date: 'desc' },
   });
 }

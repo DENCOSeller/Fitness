@@ -1,6 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/db';
+import { getCurrentUserId } from '@/lib/auth';
 import { deleteImage } from '@/lib/upload';
 import { askClaudeVision, askClaudeVisionTwo } from '@/lib/claude';
 import { buildProgressPhotoPrompt, buildProgressComparePrompt } from '@/lib/ai-prompts';
@@ -11,10 +12,13 @@ export async function uploadProgressPhoto(data: {
   date: string;
   photoPath: string;
 }) {
+  const userId = await getCurrentUserId();
   const date = new Date(data.date + 'T00:00:00');
 
-  // Check if photo already exists for this date — replace it
-  const existing = await prisma.progressPhoto.findUnique({ where: { date } });
+  // Check if photo already exists for this date and user — replace it
+  const existing = await prisma.progressPhoto.findUnique({
+    where: { userId_date: { userId, date } },
+  });
   if (existing) {
     await deleteImage(existing.photoPath);
     return prisma.progressPhoto.update({
@@ -28,6 +32,7 @@ export async function uploadProgressPhoto(data: {
 
   return prisma.progressPhoto.create({
     data: {
+      userId,
       date,
       photoPath: data.photoPath,
     },
@@ -35,19 +40,25 @@ export async function uploadProgressPhoto(data: {
 }
 
 export async function getProgressPhotos() {
+  const userId = await getCurrentUserId();
   return prisma.progressPhoto.findMany({
+    where: { userId },
     orderBy: { date: 'desc' },
   });
 }
 
 export async function getProgressPhotoByDate(dateStr: string) {
+  const userId = await getCurrentUserId();
   const date = new Date(dateStr + 'T00:00:00');
-  return prisma.progressPhoto.findUnique({ where: { date } });
+  return prisma.progressPhoto.findUnique({
+    where: { userId_date: { userId, date } },
+  });
 }
 
 export async function deleteProgressPhoto(id: number) {
+  const userId = await getCurrentUserId();
   const photo = await prisma.progressPhoto.findUnique({ where: { id } });
-  if (!photo) {
+  if (!photo || photo.userId !== userId) {
     return { error: 'Фото не найдено' };
   }
 
@@ -57,12 +68,13 @@ export async function deleteProgressPhoto(id: number) {
 }
 
 export async function analyzeProgressPhoto(id: number) {
+  const userId = await getCurrentUserId();
   const photo = await prisma.progressPhoto.findUnique({ where: { id } });
-  if (!photo) {
+  if (!photo || photo.userId !== userId) {
     return { error: 'Фото не найдено' };
   }
 
-  const fullPath = path.join(process.cwd(), 'public', photo.photoPath);
+  const fullPath = path.join('/root/Fitness', 'public', photo.photoPath);
   let imageBuffer: Buffer;
   try {
     imageBuffer = await fs.readFile(fullPath);
@@ -89,18 +101,19 @@ export async function analyzeProgressPhoto(id: number) {
 }
 
 export async function compareProgressPhotos(id1: number, id2: number) {
+  const userId = await getCurrentUserId();
   const [photo1, photo2] = await Promise.all([
     prisma.progressPhoto.findUnique({ where: { id: id1 } }),
     prisma.progressPhoto.findUnique({ where: { id: id2 } }),
   ]);
 
-  if (!photo1 || !photo2) {
+  if (!photo1 || !photo2 || photo1.userId !== userId || photo2.userId !== userId) {
     return { error: 'Одно или оба фото не найдены' };
   }
 
   const [buf1, buf2] = await Promise.all([
-    fs.readFile(path.join(process.cwd(), 'public', photo1.photoPath)).catch(() => null),
-    fs.readFile(path.join(process.cwd(), 'public', photo2.photoPath)).catch(() => null),
+    fs.readFile(path.join('/root/Fitness', 'public', photo1.photoPath)).catch(() => null),
+    fs.readFile(path.join('/root/Fitness', 'public', photo2.photoPath)).catch(() => null),
   ]);
 
   if (!buf1 || !buf2) {

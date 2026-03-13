@@ -89,25 +89,46 @@ function groupSets(sets: SetData[]): ExGroup[] {
   return groups;
 }
 
+function getExType(ex: Exercise): string {
+  return ex.type || 'strength';
+}
+
 function exerciseSummary(sets: SetData[], type?: string): string {
   if (sets.length === 0) return '';
-  if (type === 'cardio') {
-    const parts: string[] = [];
-    for (const s of sets) {
-      const dur = s.duration ?? 0;
-      const spd = s.speed ?? 0;
-      let t = `${dur}мин`;
-      if (spd) t += ` ${spd}км/ч`;
-      parts.push(t);
+  switch (type) {
+    case 'cardio': {
+      const parts: string[] = [];
+      for (const s of sets) {
+        const dur = s.duration ?? 0;
+        const spd = s.speed ?? 0;
+        let t = `${dur}мин`;
+        if (spd) t += ` ${spd}км/ч`;
+        parts.push(t);
+      }
+      return parts.join(', ');
     }
-    return parts.join(', ');
+    case 'timed': {
+      const durations = sets.map(s => s.duration ?? 0);
+      return durations.map(d => `${d}сек`).join(', ');
+    }
+    case 'bodyweight': {
+      const reps = sets.map(s => s.reps).join('/');
+      const hasWeight = sets.some(s => s.weight > 0);
+      if (hasWeight) {
+        const w = sets[0].weight;
+        return `${sets.length}x${reps} +${w}кг`;
+      }
+      return `${sets.length}x${reps}`;
+    }
+    default: {
+      const weights = [...new Set(sets.map(s => s.weight))];
+      if (weights.length === 1) {
+        const reps = sets.map(s => s.reps).join('/');
+        return `${sets.length}x${reps} ${weights[0]}кг`;
+      }
+      return sets.map(s => `${s.reps}x${s.weight}`).join(', ');
+    }
   }
-  const weights = [...new Set(sets.map(s => s.weight))];
-  if (weights.length === 1) {
-    const reps = sets.map(s => s.reps).join('/');
-    return `${sets.length}x${reps} ${weights[0]}кг`;
-  }
-  return sets.map(s => `${s.reps}x${s.weight}`).join(', ');
 }
 
 export default function ActiveWorkoutPage() {
@@ -300,43 +321,40 @@ export default function ActiveWorkoutPage() {
 
   const handleCompleteSet = (set: SetData) => {
     const plan = planData.get(set.exerciseId);
-    const isCardio = set.exercise.type === 'cardio';
+    const exType = getExType(set.exercise);
     const edit = localEdits[set.id];
 
-    if (isCardio) {
+    const doComplete = (vals: { reps: number; weight: number; duration?: number; speed?: number; incline?: number; distance?: number }) => {
+      startTransition(async () => {
+        await updateSet(set.id, vals);
+        await completeSet(set.id);
+        setWorkout(prev => {
+          if (!prev) return prev;
+          return { ...prev, sets: prev.sets.map(s => s.id === set.id ? { ...s, ...vals, completed: true } : s) };
+        });
+        setLocalEdits(prev => { const next = { ...prev }; delete next[set.id]; return next; });
+        setTimerSeconds(plan?.restSeconds ?? 90);
+        setShowTimer(true);
+      });
+    };
+
+    if (exType === 'cardio') {
       const duration = edit?.duration ?? set.duration ?? 0;
       const speed = edit?.speed ?? set.speed ?? 0;
       const incline = edit?.incline ?? set.incline ?? 0;
       const distance = edit?.distance ?? set.distance ?? 0;
       if (duration <= 0 && speed <= 0) { showErr('Укажите длительность или скорость'); return; }
-      const vals = { reps: 0, weight: 0, duration, speed, incline, distance };
-      startTransition(async () => {
-        await updateSet(set.id, vals);
-        await completeSet(set.id);
-        setWorkout(prev => {
-          if (!prev) return prev;
-          return { ...prev, sets: prev.sets.map(s => s.id === set.id ? { ...s, ...vals, completed: true } : s) };
-        });
-        setLocalEdits(prev => { const next = { ...prev }; delete next[set.id]; return next; });
-        setTimerSeconds(plan?.restSeconds ?? 90);
-        setShowTimer(true);
-      });
+      doComplete({ reps: 0, weight: 0, duration, speed, incline, distance });
+    } else if (exType === 'timed') {
+      const duration = edit?.duration ?? set.duration ?? 0;
+      if (duration <= 0) { showErr('Укажите длительность'); return; }
+      doComplete({ reps: 0, weight: 0, duration });
     } else {
+      // strength / bodyweight
       const reps = edit?.reps ?? (set.reps || plan?.plannedReps || 0);
       const weight = edit?.weight ?? (set.weight || plan?.plannedWeight || 0);
       if (reps <= 0) { showErr('Укажите повторения'); return; }
-      const vals = { reps, weight };
-      startTransition(async () => {
-        await updateSet(set.id, vals);
-        await completeSet(set.id);
-        setWorkout(prev => {
-          if (!prev) return prev;
-          return { ...prev, sets: prev.sets.map(s => s.id === set.id ? { ...s, ...vals, completed: true } : s) };
-        });
-        setLocalEdits(prev => { const next = { ...prev }; delete next[set.id]; return next; });
-        setTimerSeconds(plan?.restSeconds ?? 90);
-        setShowTimer(true);
-      });
+      doComplete({ reps, weight });
     }
   };
 
@@ -422,6 +440,39 @@ export default function ActiveWorkoutPage() {
     </div>
   );
 
+  const renderBodyweightSet = (set: SetData, idx: number) => (
+    <div key={set.id} className={`flex items-center gap-1.5 w-full px-2 overflow-hidden ${set.completed ? 'opacity-40' : ''}`}>
+      <span className="w-5 shrink-0 text-text-secondary text-xs text-center">{idx + 1}</span>
+      <input type="number" inputMode="numeric" placeholder="0"
+        value={getVal(set, 'reps')} disabled={set.completed}
+        onFocus={() => handleSetFocus(set.id)}
+        onChange={e => setLocal(set.id, 'reps', parseInt(e.target.value) || 0, set)}
+        className={inputCls}
+      />
+      <span className="shrink-0 text-text-secondary text-xs px-1">|</span>
+      <input type="number" inputMode="decimal" placeholder="—"
+        value={set.weight > 0 || localEdits[set.id]?.weight ? getVal(set, 'weight') : ''} disabled={set.completed}
+        onFocus={() => handleSetFocus(set.id)}
+        onChange={e => setLocal(set.id, 'weight', parseFloat(e.target.value) || 0, set)}
+        className={inputCls}
+      />
+      {renderCompleteBtn(set)}
+    </div>
+  );
+
+  const renderTimedSet = (set: SetData, idx: number) => (
+    <div key={set.id} className={`flex items-center gap-1.5 w-full px-2 overflow-hidden ${set.completed ? 'opacity-40' : ''}`}>
+      <span className="w-5 shrink-0 text-text-secondary text-xs text-center">{idx + 1}</span>
+      <input type="number" inputMode="numeric" placeholder="0"
+        value={getCardioVal(set, 'duration')} disabled={set.completed}
+        onFocus={() => handleSetFocus(set.id)}
+        onChange={e => setLocal(set.id, 'duration', parseInt(e.target.value) || 0, set)}
+        className={inputCls}
+      />
+      {renderCompleteBtn(set)}
+    </div>
+  );
+
   const renderCardioSet = (set: SetData, idx: number) => (
     <div key={set.id} className={`space-y-1 px-2 ${set.completed ? 'opacity-40' : ''}`}>
       {/* Row 1: duration | speed | check */}
@@ -497,7 +548,7 @@ export default function ActiveWorkoutPage() {
   // Active workout
   const groups = groupSets(workout.sets);
   const completedSets = workout.sets.filter(s => s.completed).length;
-  const isCardioEx = (ex: Exercise) => ex.type === 'cardio';
+  // getExType defined above as a module-level function
 
   return (
     <div className="min-h-screen pb-[160px] overflow-x-hidden">
@@ -531,7 +582,7 @@ export default function ActiveWorkoutPage() {
 
         {groups.map(group => {
           const isCollapsed_ = collapsed.has(group.exercise.id);
-          const cardio = isCardioEx(group.exercise);
+          const exType = getExType(group.exercise);
           return (
             <div key={group.exercise.id} className={`rounded-2xl overflow-hidden ${group.allDone && group.sets.length > 0 ? 'bg-card/60' : 'bg-card border border-border'}`}>
               {/* Exercise header */}
@@ -570,18 +621,15 @@ export default function ActiveWorkoutPage() {
                   {/* Plan hint */}
                   {planData.has(group.exercise.id) && (() => {
                     const p = planData.get(group.exercise.id)!;
-                    return (
-                      <div className="px-4 pb-1 text-xs text-gray-500">
-                        {cardio
-                          ? `План: ${p.plannedSets} подх. × ${p.plannedReps} мин`
-                          : `План: ${p.plannedSets} × ${p.plannedReps} повт.${p.plannedWeight ? ` × ${p.plannedWeight} кг` : ''}`
-                        }
-                      </div>
-                    );
+                    let hint = '';
+                    if (exType === 'cardio') hint = `План: ${p.plannedSets} подх. × ${p.plannedReps} мин`;
+                    else if (exType === 'timed') hint = `План: ${p.plannedSets} подх. × ${p.plannedReps} сек`;
+                    else hint = `План: ${p.plannedSets} × ${p.plannedReps} повт.${p.plannedWeight ? ` × ${p.plannedWeight} кг` : ''}`;
+                    return <div className="px-4 pb-1 text-xs text-gray-500">{hint}</div>;
                   })()}
 
                   {/* Column headers */}
-                  {cardio ? (
+                  {exType === 'cardio' ? (
                     <>
                       <div className="flex items-center gap-1.5 text-text-secondary text-xs px-2 w-full overflow-hidden">
                         <span className="w-5 shrink-0 text-center">#</span>
@@ -597,6 +645,20 @@ export default function ActiveWorkoutPage() {
                         <span className="w-10 shrink-0" />
                       </div>
                     </>
+                  ) : exType === 'timed' ? (
+                    <div className="flex items-center gap-1.5 text-text-secondary text-xs px-2 w-full overflow-hidden">
+                      <span className="w-5 shrink-0 text-center">#</span>
+                      <span className="flex-1 min-w-0 text-center">Длительность (сек)</span>
+                      <span className="w-10 shrink-0" />
+                    </div>
+                  ) : exType === 'bodyweight' ? (
+                    <div className="flex items-center gap-1.5 text-text-secondary text-xs px-2 w-full overflow-hidden">
+                      <span className="w-5 shrink-0 text-center">#</span>
+                      <span className="flex-1 min-w-0 text-center">Повт.</span>
+                      <span className="shrink-0 px-1" />
+                      <span className="flex-1 min-w-0 text-center">Утяжелитель (кг)</span>
+                      <span className="w-10 shrink-0" />
+                    </div>
                   ) : (
                     <div className="flex items-center gap-1.5 text-text-secondary text-xs px-2 w-full overflow-hidden">
                       <span className="w-5 shrink-0 text-center">#</span>
@@ -608,9 +670,14 @@ export default function ActiveWorkoutPage() {
                   )}
 
                   {/* Set rows */}
-                  {group.sets.map((set, idx) =>
-                    cardio ? renderCardioSet(set, idx) : renderStrengthSet(set, idx)
-                  )}
+                  {group.sets.map((set, idx) => {
+                    switch (exType) {
+                      case 'cardio': return renderCardioSet(set, idx);
+                      case 'timed': return renderTimedSet(set, idx);
+                      case 'bodyweight': return renderBodyweightSet(set, idx);
+                      default: return renderStrengthSet(set, idx);
+                    }
+                  })}
 
                   <div className="flex gap-2 pt-1 px-2">
                     <button onClick={() => handleAddSet(group.exercise.id)} disabled={isPending}

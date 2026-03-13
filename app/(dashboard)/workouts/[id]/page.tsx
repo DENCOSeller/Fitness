@@ -259,6 +259,8 @@ function PlanPreview({
         const sets = localSets[pe.id] ?? [];
         const exId = pe.exerciseId;
         const last = exId ? lastWeights[exId] : null;
+        const exType = pe.exercise?.type || 'strength';
+        const isStrengthLike = exType === 'strength' || exType === 'bodyweight';
 
         return (
           <div key={pe.id} className="bg-card rounded-2xl p-4 space-y-3">
@@ -285,40 +287,75 @@ function PlanPreview({
             {/* Sets table */}
             <div className="space-y-2">
               {/* Header row */}
-              <div className="flex items-center gap-2 text-text-secondary text-xs px-1">
-                <span className="w-6 text-center">#</span>
-                <span className="flex-1 text-center">Повт.</span>
-                <span className="w-4" />
-                <span className="flex-1 text-center">Вес кг</span>
-                <span className="w-7" />
-              </div>
+              {exType === 'timed' ? (
+                <div className="flex items-center gap-2 text-text-secondary text-xs px-1">
+                  <span className="w-6 text-center">#</span>
+                  <span className="flex-1 text-center">Длительность (сек)</span>
+                  <span className="w-7" />
+                </div>
+              ) : exType === 'cardio' ? (
+                <div className="flex items-center gap-2 text-text-secondary text-xs px-1">
+                  <span className="w-6 text-center">#</span>
+                  <span className="flex-1 text-center">Длит.(мин)</span>
+                  <span className="w-4" />
+                  <span className="flex-1 text-center">Скор.(км/ч)</span>
+                  <span className="w-7" />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-text-secondary text-xs px-1">
+                  <span className="w-6 text-center">#</span>
+                  <span className="flex-1 text-center">Повт.</span>
+                  <span className="w-4" />
+                  <span className="flex-1 text-center">{exType === 'bodyweight' ? 'Утяж. кг' : 'Вес кг'}</span>
+                  <span className="w-7" />
+                </div>
+              )}
 
               {sets.map((set, idx) => (
                 <div key={idx} className="flex items-center gap-2">
                   <span className="text-text-secondary text-xs w-6 text-center">
                     {idx + 1}
                   </span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={set.reps || ''}
-                    onChange={(e) =>
-                      updateSet(pe.id, idx, { reps: parseInt(e.target.value) || 0 })
-                    }
-                    className="flex-1 bg-bg border border-border rounded-lg px-2 py-2 text-sm text-text text-center focus:border-accent outline-none"
-                  />
-                  <span className="text-text-secondary text-xs w-4 text-center">×</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    value={set.weight || ''}
-                    onChange={(e) =>
-                      updateSet(pe.id, idx, {
-                        weight: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="flex-1 bg-bg border border-border rounded-lg px-2 py-2 text-sm text-text text-center focus:border-accent outline-none"
-                  />
+                  {exType === 'timed' ? (
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={set.reps || ''}
+                      placeholder="сек"
+                      onChange={(e) =>
+                        updateSet(pe.id, idx, { reps: parseInt(e.target.value) || 0 })
+                      }
+                      className="flex-1 bg-bg border border-border rounded-lg px-2 py-2 text-sm text-text text-center focus:border-accent outline-none"
+                    />
+                  ) : (
+                    <>
+                      <input
+                        type="number"
+                        inputMode={exType === 'cardio' ? 'decimal' : 'numeric'}
+                        value={set.reps || ''}
+                        placeholder={exType === 'cardio' ? 'мин' : '0'}
+                        onChange={(e) =>
+                          updateSet(pe.id, idx, { reps: parseInt(e.target.value) || 0 })
+                        }
+                        className="flex-1 bg-bg border border-border rounded-lg px-2 py-2 text-sm text-text text-center focus:border-accent outline-none"
+                      />
+                      <span className="text-text-secondary text-xs w-4 text-center">
+                        {exType === 'cardio' ? '|' : '×'}
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={exType === 'bodyweight' ? (set.weight || '') : (set.weight || '')}
+                        placeholder={exType === 'bodyweight' ? '—' : '0'}
+                        onChange={(e) =>
+                          updateSet(pe.id, idx, {
+                            weight: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        className="flex-1 bg-bg border border-border rounded-lg px-2 py-2 text-sm text-text text-center focus:border-accent outline-none"
+                      />
+                    </>
+                  )}
                   <button
                     onClick={() => handleRemoveSet(pe.id, idx)}
                     disabled={sets.length <= 1}
@@ -341,9 +378,9 @@ function PlanPreview({
             </button>
 
             {/* Last weight hint */}
-            {last && (
+            {last && isStrengthLike && (
               <p className="text-text-secondary text-xs">
-                💡 Последний раз: {last.weight} кг, {last.reps} повт. ({formatDate(last.date)})
+                Последний раз: {last.weight} кг, {last.reps} повт. ({formatDate(last.date)})
               </p>
             )}
 
@@ -376,7 +413,7 @@ function PlanPreview({
                   onClick={() => setRestEditing(pe.id)}
                   className="text-text-secondary text-xs hover:text-text transition-colors"
                 >
-                  ⏱ Отдых: {pe.restSeconds ?? 90}с
+                  Отдых: {pe.restSeconds ?? 90}с
                 </button>
               )}
             </div>
@@ -452,8 +489,7 @@ function CompletedView({
     return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
-  const isCardioSet = (set: WorkoutSet): boolean =>
-    set.exercise.type === 'cardio' || set.exercise.muscleGroup === 'Кардио' || set.duration != null;
+  const getExType = (ex: { type?: string }) => ex.type || 'strength';
 
   const groupByExercise = (sets: WorkoutSet[]) => {
     const groups: { exercise: WorkoutSet['exercise']; sets: WorkoutSet[] }[] = [];
@@ -469,7 +505,10 @@ function CompletedView({
   };
 
   const groups = groupByExercise(workout.sets);
-  const strengthSets = workout.sets.filter((s) => !isCardioSet(s));
+  const strengthSets = workout.sets.filter((s) => {
+    const t = getExType(s.exercise);
+    return t === 'strength' || t === 'bodyweight';
+  });
   const totalVolume = strengthSets.reduce((sum, s) => sum + s.reps * s.weight, 0);
 
   return (
@@ -518,14 +557,14 @@ function CompletedView({
       </div>
 
       {groups.map((group, idx) => {
-        const isCardio = isCardioSet(group.sets[0]);
+        const exType = getExType(group.exercise);
         return (
           <div key={idx} className="bg-card rounded-2xl p-4">
             <div className="flex items-center justify-between mb-3">
               <span className="text-text font-medium text-sm">{group.exercise.name}</span>
               <span className="text-text-secondary text-xs">{group.exercise.muscleGroup}</span>
             </div>
-            {isCardio ? (
+            {exType === 'cardio' ? (
               <div className="space-y-1.5">
                 {group.sets.map((set, setIdx) => {
                   const parts: string[] = [];
@@ -543,14 +582,29 @@ function CompletedView({
                   );
                 })}
               </div>
+            ) : exType === 'timed' ? (
+              <div className="space-y-1.5">
+                {group.sets.map((set, setIdx) => (
+                  <div key={setIdx} className="flex items-center gap-3 text-sm">
+                    <span className="text-text-secondary w-6 text-center text-xs">{setIdx + 1}</span>
+                    <span className="text-text">{set.duration ?? 0} сек</span>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="space-y-1.5">
                 {group.sets.map((set, setIdx) => (
                   <div key={setIdx} className="flex items-center gap-3 text-sm">
                     <span className="text-text-secondary w-6 text-center text-xs">{setIdx + 1}</span>
                     <span className="text-text">{set.reps} повт.</span>
-                    <span className="text-text-secondary">×</span>
-                    <span className="text-text">{set.weight} кг</span>
+                    {(exType === 'strength' || set.weight > 0) && (
+                      <>
+                        <span className="text-text-secondary">×</span>
+                        <span className="text-text">
+                          {exType === 'bodyweight' && set.weight > 0 ? `+${set.weight}` : set.weight} кг
+                        </span>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>

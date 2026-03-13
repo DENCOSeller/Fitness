@@ -89,8 +89,8 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
       const exercises = w.sets.reduce((acc, s) => {
         const name = s.exercise.name;
         if (!acc[name]) acc[name] = [];
-        const isCardio = s.exercise.type === 'cardio' || s.exercise.muscleGroup === 'Кардио' || s.duration != null;
-        if (isCardio) {
+        const exType = s.exercise.type || 'strength';
+        if (exType === 'cardio' || exType === 'timed') {
           const parts: string[] = [];
           if (s.duration) parts.push(`${s.duration} мин`);
           if (s.distance) parts.push(`${s.distance} км`);
@@ -223,10 +223,14 @@ export async function buildTrainerSystemPrompt(userId?: number): Promise<string>
 - Когда составляешь план тренировки:
   1. ОБЯЗАТЕЛЬНО вызови инструмент create_workout_plan со структурированными данными
   2. Помимо вызова инструмента, опиши план текстом для пользователя (формат списка, НЕ таблицы)
-  3. ВСЕГДА указывай рекомендуемый вес (weight_kg) на основе истории тренировок пользователя
-  4. Если истории для упражнения нет — укажи разумный начальный вес для новичка
-  5. Используй ТОЛЬКО названия упражнений из каталога (раздел "Каталог упражнений")
-  6. Указывай рекомендуемое время отдыха (rest_seconds): 60-90с для лёгких, 120-180с для тяжёлых
+  3. Используй ТОЛЬКО названия упражнений из каталога (раздел "Каталог упражнений")
+  4. Указывай рекомендуемое время отдыха (rest_seconds): 60-90с для лёгких, 120-180с для тяжёлых
+  5. ОБЯЗАТЕЛЬНО указывай type для КАЖДОГО упражнения:
+     - strength: силовые со штангой/гантелями → reps + weight_kg (на основе истории или начальный вес)
+     - bodyweight: отжимания/подтягивания/выпады без веса → reps (weight_kg только если утяжелитель)
+     - cardio: бег/велосипед/дорожка/гребля → duration_min + speed_kmh/distance_km/incline_pct
+     - timed: планка/растяжка/вис/стенка → duration_min (в минутах, напр. 0.5 для 30 сек)
+  6. НЕ указывай reps/weight_kg для cardio и timed. НЕ указывай duration_min для strength и bodyweight.
 
 Сегодня: ${fmt(now)}
 

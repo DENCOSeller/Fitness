@@ -1,20 +1,45 @@
+export type ExerciseType = 'strength' | 'bodyweight' | 'cardio' | 'timed';
+
 export interface ParsedExercise {
   name: string;
+  type: ExerciseType;
   sets: number;
-  reps: number;
-  weight: number;
+  reps?: number;
+  weight?: number;
+  durationMin?: number;
+  speedKmh?: number;
+  distanceKm?: number;
+  inclinePct?: number;
   restSeconds?: number;
 }
 
 // Convert tool_use input to ParsedExercise array
 export function toolUseToParsedExercises(
-  input: { exercises: { name: string; sets: number; reps: number; weight_kg?: number; rest_seconds?: number }[] },
+  input: {
+    exercises: {
+      name: string;
+      type?: ExerciseType;
+      sets: number;
+      reps?: number;
+      weight_kg?: number;
+      duration_min?: number;
+      speed_kmh?: number;
+      distance_km?: number;
+      incline_pct?: number;
+      rest_seconds?: number;
+    }[];
+  },
 ): ParsedExercise[] {
   return input.exercises.map(ex => ({
     name: ex.name,
+    type: ex.type ?? 'strength',
     sets: ex.sets,
     reps: ex.reps,
-    weight: ex.weight_kg ?? 0,
+    weight: ex.weight_kg,
+    durationMin: ex.duration_min,
+    speedKmh: ex.speed_kmh,
+    distanceKm: ex.distance_km,
+    inclinePct: ex.incline_pct,
     restSeconds: ex.rest_seconds,
   }));
 }
@@ -40,6 +65,7 @@ export function parseWorkoutPlan(text: string): ParsedExercise[] | null {
     if (match) {
       exercises.push({
         name: match[1].trim(),
+        type: 'strength',
         sets: parseInt(match[2]),
         reps: parseInt(match[3]),
         weight: match[4] ? parseFloat(match[4].replace(',', '.')) : 0,
@@ -52,6 +78,7 @@ export function parseWorkoutPlan(text: string): ParsedExercise[] | null {
     if (match) {
       exercises.push({
         name: match[1].trim(),
+        type: 'strength',
         sets: parseInt(match[2]),
         reps: parseInt(match[3]),
         weight: match[4] ? parseFloat(match[4].replace(',', '.')) : 0,
@@ -64,6 +91,7 @@ export function parseWorkoutPlan(text: string): ParsedExercise[] | null {
     if (match) {
       exercises.push({
         name: match[1].trim(),
+        type: 'strength',
         sets: parseInt(match[2]),
         reps: parseInt(match[3]),
         weight: match[4] ? parseFloat(match[4].replace(',', '.')) : 0,
@@ -85,7 +113,7 @@ export function parseWorkoutPlan(text: string): ParsedExercise[] | null {
             const wMatch = cells[3].match(/(\d+(?:[.,]\d+)?)/);
             if (wMatch) weight = parseFloat(wMatch[1].replace(',', '.'));
           }
-          exercises.push({ name, sets: setsVal, reps: repsVal, weight });
+          exercises.push({ name, type: 'strength', sets: setsVal, reps: repsVal, weight });
           continue;
         }
       }

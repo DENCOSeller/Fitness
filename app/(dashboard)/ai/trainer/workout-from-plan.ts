@@ -24,6 +24,7 @@ export async function createWorkoutFromPlan(
     plannedSets: ex.sets,
     plannedReps: ex.reps,
     plannedWeight: ex.weight || null,
+    restSeconds: ex.restSeconds ?? null,
     sortOrder: idx + 1,
   }));
 

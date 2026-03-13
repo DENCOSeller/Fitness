@@ -3,6 +3,20 @@ export interface ParsedExercise {
   sets: number;
   reps: number;
   weight: number;
+  restSeconds?: number;
+}
+
+// Convert tool_use input to ParsedExercise array
+export function toolUseToParsedExercises(
+  input: { exercises: { name: string; sets: number; reps: number; weight_kg?: number; rest_seconds?: number }[] },
+): ParsedExercise[] {
+  return input.exercises.map(ex => ({
+    name: ex.name,
+    sets: ex.sets,
+    reps: ex.reps,
+    weight: ex.weight_kg ?? 0,
+    restSeconds: ex.rest_seconds,
+  }));
 }
 
 // Parse AI trainer response to extract workout plan

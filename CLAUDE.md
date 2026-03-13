@@ -119,6 +119,10 @@ pm2 restart denco-health   # Рестарт
 
 `createWorkoutFromPlan()` создаёт одним запросом: `Workout(status='planned')` + `WorkoutPlanExercise[]` (план AI) + `WorkoutSet[]` (предзаполнение для активного режима).
 
+### AI Tool Use (`app/api/chat/route.ts`)
+
+Claude вызывает `create_workout_plan` tool со структурированными данными (exercises, weight_kg, rest_seconds). Стриминг обрабатывает `input_json_delta` → отправляет `{ tool_use }` по SSE. Клиент (`ai/trainer/page.tsx`) использует tool_use данные с приоритетом над regex-парсером. Системный промпт (`lib/ai-trainer.ts`) обязывает AI указывать веса и время отдыха.
+
 ## Environment Variables (.env)
 
 - `DATABASE_URL` — PostgreSQL connection string

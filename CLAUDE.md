@@ -90,6 +90,27 @@ pm2 restart denco-health   # Рестарт
 - **Nginx конфиг**: `nginx.conf` (копируется в `/etc/nginx/sites-available/`)
 - **Standalone build**: `next.config.ts` → `output: "standalone"`
 
+## Workout Plan (Sprint: AI Plan vs Fact)
+
+### БД (миграция `20260313090635_add_workout_plan_exercises`)
+
+Таблица `workout_plan_exercises` — хранит план от AI тренера отдельно от фактических подходов (`workout_sets`).
+
+| Поле | Тип | Назначение |
+|------|-----|------------|
+| `workout_id` | `Int` FK CASCADE | Связь с Workout |
+| `exercise_id` | `Int?` FK SET NULL | Связь с Exercise (nullable — если не найдено в каталоге) |
+| `exercise_name` | `String` | Оригинальное имя от AI |
+| `planned_sets` | `Int` | Кол-во подходов по плану |
+| `planned_reps` | `Int` | Повторения по плану |
+| `planned_weight` | `Float?` | Вес по плану (nullable) |
+| `rest_seconds` | `Int?` | Рекомендуемый отдых |
+| `sort_order` | `Int` | Порядок в плане |
+
+**Связи:** `Workout hasMany WorkoutPlanExercise`, `Exercise hasMany WorkoutPlanExercise (SET NULL)`
+
+**Концепция:** План (что рекомендовал AI) живёт в `workout_plan_exercises`, факт (что сделал пользователь) — в `workout_sets`. Можно сравнивать plan vs fact после завершения.
+
 ## Environment Variables (.env)
 
 - `DATABASE_URL` — PostgreSQL connection string

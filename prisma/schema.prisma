@@ -71,9 +71,10 @@ model Exercise {
   isSystem     Boolean  @default(false) @map("is_system")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  user              User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
   workoutSets       WorkoutSet[]
   templateExercises TemplateExercise[]
+  planExercises     WorkoutPlanExercise[]
 
   @@map("exercises")
 }
@@ -90,8 +91,9 @@ model Workout {
   endedAt     DateTime? @map("ended_at")
   createdAt   DateTime  @default(now()) @map("created_at")
 
-  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sets WorkoutSet[]
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sets          WorkoutSet[]
+  planExercises WorkoutPlanExercise[]
 
   @@map("workouts")
 }
@@ -116,6 +118,24 @@ model WorkoutSet {
   exercise Exercise @relation(fields: [exerciseId], references: [id])
 
   @@map("workout_sets")
+}
+
+model WorkoutPlanExercise {
+  id            Int      @id @default(autoincrement())
+  workoutId     Int      @map("workout_id")
+  exerciseId    Int?     @map("exercise_id")
+  exerciseName  String   @map("exercise_name")
+  plannedSets   Int      @map("planned_sets")
+  plannedReps   Int      @map("planned_reps")
+  plannedWeight Float?   @map("planned_weight")
+  restSeconds   Int?     @map("rest_seconds")
+  sortOrder     Int      @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  workout  Workout   @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise Exercise? @relation(fields: [exerciseId], references: [id])
+
+  @@map("workout_plan_exercises")
 }
 
 model WorkoutTemplate {

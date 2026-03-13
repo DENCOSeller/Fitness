@@ -147,6 +147,28 @@ Claude вызывает `create_workout_plan` tool со структуриров
 
 Принимает optional `overrides: { planExerciseId, sets[] }[]` — per-set данные из клиентского стейта. Создаёт `WorkoutSet` из `planExercises` с учётом правок пользователя.
 
+## Sprint Summary: Active Workout + AI Plan Prefill (2026-03-13)
+
+Полный цикл: AI генерирует план → пользователь редактирует → запускает → выполняет с подсказками.
+
+### Что реализовано
+
+| # | Коммит | Что |
+|---|--------|-----|
+| Chunk 1 | `8b3290a` | WorkoutPlanExercise таблица — хранит план от AI отдельно от факта |
+| Chunk 2 | `5c2af79` | Exercise fuzzy matcher — exact → partial → Левенштейн → create new |
+| Chunk 3 | `a7a012a` | AI tool_use — структурированный вывод плана вместо парсинга текста |
+| Chunk 4 | `1ce351f` | Fallback весов из истории — если AI не указал вес |
+| Chunk 5 | `d7c4710` | Редактируемый превью плана (`/workouts/[id]` для status=planned) |
+| Chunk 6 | `a9e1a61` | Предзаполнение активного режима из плана + plan hints + rest timer из плана |
+
+### Ключевые решения
+
+- **Plan vs Fact**: `workout_plan_exercises` (план AI) отделён от `workout_sets` (факт пользователя)
+- **Per-set editing**: локальный стейт на клиенте, `overrides` передаются в `startPlannedWorkout`
+- **Pre-fill приоритет**: localEdits → оригинальное значение → plan fallback → пустая строка
+- **Rest timer**: `restSeconds` из `WorkoutPlanExercise` per exercise, передаётся динамически
+
 ## Environment Variables (.env)
 
 - `DATABASE_URL` — PostgreSQL connection string

@@ -37,6 +37,9 @@ export async function getActiveWorkout() {
         include: { exercise: true },
         orderBy: { setOrder: 'asc' },
       },
+      planExercises: {
+        orderBy: { sortOrder: 'asc' },
+      },
     },
   });
 

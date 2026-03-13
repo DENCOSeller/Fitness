@@ -28,11 +28,20 @@ interface SetData {
   exercise: Exercise;
 }
 
+interface PlanExData {
+  exerciseId: number | null;
+  plannedSets: number;
+  plannedReps: number;
+  plannedWeight: number | null;
+  restSeconds: number | null;
+}
+
 interface WorkoutData {
   id: number;
   type: string;
   startedAt: string | null;
   sets: SetData[];
+  planExercises?: PlanExData[];
 }
 
 interface ExGroup {
@@ -90,11 +99,31 @@ export default function ActiveWorkoutPage() {
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [error, setError] = useState('');
   const [localEdits, setLocalEdits] = useState<Record<number, { reps: number; weight: number }>>({});
+  const [planData, setPlanData] = useState<Map<number, { plannedSets: number; plannedReps: number; plannedWeight: number; restSeconds: number }>>(new Map());
+  const [timerSeconds, setTimerSeconds] = useState(90);
 
   // Load active workout
   useEffect(() => {
     Promise.all([getActiveWorkout(), getExercises()]).then(([res, exercises]) => {
-      if (res.workout) setWorkout(res.workout as unknown as WorkoutData);
+      if (res.workout) {
+        const w = res.workout as unknown as WorkoutData;
+        setWorkout(w);
+        // Build planData map: exerciseId → plan info
+        if (w.planExercises && w.planExercises.length > 0) {
+          const m = new Map<number, { plannedSets: number; plannedReps: number; plannedWeight: number; restSeconds: number }>();
+          for (const pe of w.planExercises) {
+            if (pe.exerciseId != null) {
+              m.set(pe.exerciseId, {
+                plannedSets: pe.plannedSets,
+                plannedReps: pe.plannedReps,
+                plannedWeight: pe.plannedWeight ?? 0,
+                restSeconds: pe.restSeconds ?? 90,
+              });
+            }
+          }
+          setPlanData(m);
+        }
+      }
       setAllExercises(exercises as Exercise[]);
       setLoading(false);
     });
@@ -124,8 +153,17 @@ export default function ActiveWorkoutPage() {
   const showErr = (msg: string) => { setError(msg); setTimeout(() => setError(''), 3000); };
 
   const getVal = (set: SetData, field: 'reps' | 'weight'): number | string => {
-    const v = localEdits[set.id]?.[field] ?? set[field];
-    return v || '';
+    const edited = localEdits[set.id]?.[field];
+    if (edited !== undefined && edited !== null) return edited;
+    const orig = set[field];
+    if (orig !== undefined && orig !== null && orig !== 0) return orig;
+    // Fallback to plan data
+    const plan = planData.get(set.exerciseId);
+    if (plan) {
+      const planVal = field === 'reps' ? plan.plannedReps : plan.plannedWeight;
+      if (planVal !== undefined && planVal !== null && planVal !== 0) return planVal;
+    }
+    return '';
   };
 
   const setLocal = (setId: number, field: 'reps' | 'weight', value: number, orig: SetData) => {
@@ -190,7 +228,11 @@ export default function ActiveWorkoutPage() {
   };
 
   const handleCompleteSet = (set: SetData) => {
-    const vals = localEdits[set.id] || { reps: set.reps, weight: set.weight };
+    // Resolve values: localEdits → original → plan fallback
+    const plan = planData.get(set.exerciseId);
+    const reps = localEdits[set.id]?.reps ?? (set.reps || plan?.plannedReps || 0);
+    const weight = localEdits[set.id]?.weight ?? (set.weight || plan?.plannedWeight || 0);
+    const vals = { reps, weight };
     if (vals.reps <= 0) { showErr('Укажите повторения'); return; }
     startTransition(async () => {
       await updateSet(set.id, vals);
@@ -205,6 +247,9 @@ export default function ActiveWorkoutPage() {
         };
       });
       setLocalEdits(prev => { const next = { ...prev }; delete next[set.id]; return next; });
+      // Use plan rest time if available
+      const restSec = plan?.restSeconds ?? 90;
+      setTimerSeconds(restSec);
       setShowTimer(true);
     });
   };
@@ -269,7 +314,7 @@ export default function ActiveWorkoutPage() {
   const completedSets = workout.sets.filter(s => s.completed).length;
 
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen pb-[160px] overflow-x-hidden">
       {/* Sticky header */}
       <div className="sticky top-0 z-40 bg-bg/95 backdrop-blur-sm border-b border-border">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
@@ -323,31 +368,40 @@ export default function ActiveWorkoutPage() {
 
               {/* Sets */}
               {!isCollapsed && (
-                <div className="px-4 pb-4 space-y-2">
-                  <div className="flex items-center gap-2 text-text-secondary text-xs px-1">
-                    <span className="w-6 text-center">#</span>
-                    <span className="flex-1 text-center">Повт.</span>
-                    <span className="w-3" />
-                    <span className="flex-1 text-center">Вес (кг)</span>
-                    <span className="w-9" />
+                <div className="pb-4 space-y-2 overflow-hidden">
+                  {/* Plan hint */}
+                  {planData.has(group.exercise.id) && (() => {
+                    const p = planData.get(group.exercise.id)!;
+                    return (
+                      <div className="px-4 pb-1 text-xs text-gray-500">
+                        План: {p.plannedSets} × {p.plannedReps} повт.{p.plannedWeight ? ` × ${p.plannedWeight} кг` : ''}
+                      </div>
+                    );
+                  })()}
+                  <div className="flex items-center gap-1.5 text-text-secondary text-xs px-3 overflow-hidden">
+                    <span className="w-5 shrink-0 text-center">#</span>
+                    <span className="flex-1 min-w-0 text-center">Повт.</span>
+                    <span className="shrink-0 px-0.5" />
+                    <span className="flex-1 min-w-0 text-center">Вес (кг)</span>
+                    <span className="w-10 shrink-0" />
                   </div>
 
                   {group.sets.map((set, idx) => (
-                    <div key={set.id} className={`flex items-center gap-2 ${set.completed ? 'opacity-40' : ''}`}>
-                      <span className="text-text-secondary text-xs w-6 text-center">{idx + 1}</span>
+                    <div key={set.id} className={`flex items-center gap-1.5 px-2 overflow-hidden ${set.completed ? 'opacity-40' : ''}`}>
+                      <span className="w-5 shrink-0 text-text-secondary text-xs text-center">{idx + 1}</span>
                       <input type="number" inputMode="numeric" placeholder="0"
                         value={getVal(set, 'reps')} disabled={set.completed}
                         onChange={e => setLocal(set.id, 'reps', parseInt(e.target.value) || 0, set)}
-                        className="flex-1 bg-bg border border-border rounded-lg px-3 py-2.5 text-sm text-text text-center focus:border-accent outline-none disabled:opacity-50 min-w-0"
+                        className="flex-1 min-w-0 bg-bg border border-border rounded-lg px-1 py-1.5 text-sm text-text text-center focus:border-accent outline-none disabled:opacity-50"
                       />
-                      <span className="text-text-secondary text-xs">x</span>
+                      <span className="shrink-0 text-text-secondary text-xs px-0.5">x</span>
                       <input type="number" inputMode="decimal" placeholder="0"
                         value={getVal(set, 'weight')} disabled={set.completed}
                         onChange={e => setLocal(set.id, 'weight', parseFloat(e.target.value) || 0, set)}
-                        className="flex-1 bg-bg border border-border rounded-lg px-3 py-2.5 text-sm text-text text-center focus:border-accent outline-none disabled:opacity-50 min-w-0"
+                        className="flex-1 min-w-0 bg-bg border border-border rounded-lg px-1 py-1.5 text-sm text-text text-center focus:border-accent outline-none disabled:opacity-50"
                       />
                       {set.completed ? (
-                        <div className="w-9 flex justify-center">
+                        <div className="w-10 h-10 shrink-0 flex items-center justify-center">
                           <svg className="w-5 h-5 text-success" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
                           </svg>
@@ -355,7 +409,7 @@ export default function ActiveWorkoutPage() {
                       ) : (
                         <button onClick={() => handleCompleteSet(set)}
                           disabled={isPending}
-                          className="w-9 h-9 flex items-center justify-center rounded-lg bg-success/15 text-success hover:bg-success/25 transition-colors disabled:opacity-30"
+                          className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg bg-success/15 text-success hover:bg-success/25 transition-colors disabled:opacity-30"
                         >
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
@@ -365,7 +419,7 @@ export default function ActiveWorkoutPage() {
                     </div>
                   ))}
 
-                  <div className="flex gap-2 pt-1">
+                  <div className="flex gap-2 pt-1 px-2">
                     <button onClick={() => handleAddSet(group.exercise.id)} disabled={isPending}
                       className="flex-1 text-accent text-sm py-2 hover:bg-accent/10 rounded-lg transition-colors">
                       + Подход
@@ -391,10 +445,10 @@ export default function ActiveWorkoutPage() {
       </div>
 
       {/* Rest timer overlay */}
-      <RestTimer isOpen={showTimer} onClose={() => setShowTimer(false)} defaultSeconds={90} />
+      <RestTimer isOpen={showTimer} onClose={() => setShowTimer(false)} defaultSeconds={timerSeconds} />
 
       {/* Sticky finish button */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-bg/95 backdrop-blur-sm border-t border-border" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div className="fixed left-0 right-0 z-50 bg-bg/95 backdrop-blur-sm border-t border-border" style={{ bottom: '83px' }}>
         <div className="max-w-lg mx-auto px-4 py-3">
           <button onClick={handleFinish} disabled={isPending || workout.sets.length === 0}
             className={`w-full py-3.5 text-base font-semibold rounded-2xl transition-all ${confirmFinish ? 'bg-success text-white' : 'btn-gradient'}`}

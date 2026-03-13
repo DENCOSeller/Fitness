@@ -111,6 +111,14 @@ pm2 restart denco-health   # Рестарт
 
 **Концепция:** План (что рекомендовал AI) живёт в `workout_plan_exercises`, факт (что сделал пользователь) — в `workout_sets`. Можно сравнивать plan vs fact после завершения.
 
+### Exercise Matcher (`lib/exercise-matcher.ts`)
+
+Нечёткий поиск упражнений по названию от AI: exact → partial (includes) → Левенштейн (порог >0.7) → create new (`muscleGroup: 'Другое'`). Batch-версия `findOrCreateExercises()` грузит все упражнения одним запросом.
+
+### Создание плана (`app/(dashboard)/ai/trainer/workout-from-plan.ts`)
+
+`createWorkoutFromPlan()` создаёт одним запросом: `Workout(status='planned')` + `WorkoutPlanExercise[]` (план AI) + `WorkoutSet[]` (предзаполнение для активного режима).
+
 ## Environment Variables (.env)
 
 - `DATABASE_URL` — PostgreSQL connection string

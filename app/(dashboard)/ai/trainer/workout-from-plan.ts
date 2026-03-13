@@ -2,55 +2,41 @@
 
 import { prisma } from '@/lib/db';
 import { getCurrentUserId } from '@/lib/auth';
+import { findOrCreateExercises } from '@/lib/exercise-matcher';
 import type { ParsedExercise } from '@/lib/workout-plan-parser';
 
-// Create a planned workout from parsed exercises
-export async function createWorkoutFromPlan(exercises: ParsedExercise[], workoutType?: string): Promise<{ success: boolean; id?: number; error?: string }> {
+export async function createWorkoutFromPlan(
+  exercises: ParsedExercise[],
+  workoutType?: string,
+): Promise<{ success: boolean; id?: number; error?: string }> {
   const userId = await getCurrentUserId();
 
+  // Match all exercise names against DB (fuzzy search + auto-create)
+  const matches = await findOrCreateExercises(
+    exercises.map(ex => ex.name),
+    userId,
+  );
+
+  // Build plan exercises (what AI recommended)
+  const planData = exercises.map((ex, idx) => ({
+    exerciseId: matches[idx].exerciseId,
+    exerciseName: ex.name.trim(),
+    plannedSets: ex.sets,
+    plannedReps: ex.reps,
+    plannedWeight: ex.weight || null,
+    sortOrder: idx + 1,
+  }));
+
+  // Build workout sets (pre-filled from plan for active mode)
   const setsData: { exerciseId: number; setOrder: number; reps: number; weight: number }[] = [];
 
   for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
     const ex = exercises[exIdx];
+    const exerciseId = matches[exIdx].exerciseId;
 
-    // Find exercise in DB (system or user's own)
-    let dbExercise = await prisma.exercise.findFirst({
-      where: {
-        OR: [
-          { isSystem: true, name: { equals: ex.name, mode: 'insensitive' } },
-          { userId, name: { equals: ex.name, mode: 'insensitive' } },
-        ],
-      },
-    });
-
-    // If not found, try partial match
-    if (!dbExercise) {
-      dbExercise = await prisma.exercise.findFirst({
-        where: {
-          OR: [
-            { isSystem: true, name: { contains: ex.name, mode: 'insensitive' } },
-            { userId, name: { contains: ex.name, mode: 'insensitive' } },
-          ],
-        },
-      });
-    }
-
-    // If still not found, create a user exercise
-    if (!dbExercise) {
-      dbExercise = await prisma.exercise.create({
-        data: {
-          userId,
-          name: ex.name,
-          muscleGroup: 'Другое',
-          type: 'strength',
-        },
-      });
-    }
-
-    // Create sets
     for (let setIdx = 0; setIdx < ex.sets; setIdx++) {
       setsData.push({
-        exerciseId: dbExercise.id,
+        exerciseId,
         setOrder: exIdx * 100 + setIdx + 1,
         reps: ex.reps,
         weight: ex.weight,
@@ -65,6 +51,7 @@ export async function createWorkoutFromPlan(exercises: ParsedExercise[], workout
       type: workoutType || 'Силовая',
       status: 'planned',
       note: 'Создано из плана AI тренера',
+      planExercises: { create: planData },
       sets: { create: setsData },
     },
   });

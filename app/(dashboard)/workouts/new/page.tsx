@@ -360,14 +360,12 @@ function NewWorkoutContent() {
         </button>
       </div>
 
-      {showTimer && (
-        <RestTimer onClose={() => setShowTimer(false)} />
-      )}
+      <RestTimer isOpen={showTimer} onClose={() => setShowTimer(false)} defaultSeconds={90} />
 
       <button
         onClick={handleSave}
         disabled={isPending || workoutExercises.length === 0}
-        className="w-full bg-accent text-white font-semibold py-3.5 rounded-2xl disabled:opacity-50 transition-colors"
+        className="btn-gradient w-full py-3.5 text-base"
       >
         {isPending ? 'Сохранение...' : 'Сохранить тренировку'}
       </button>

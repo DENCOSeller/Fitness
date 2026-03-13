@@ -3,6 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { listWorkouts } from './actions';
+import { getActiveWorkout } from './active/actions';
+import ExercisesPanel from '@/components/workouts/exercises-panel';
+
+type WorkoutsTab = 'journal' | 'exercises';
 
 interface WorkoutWithSets {
   id: number;
@@ -21,16 +25,44 @@ interface WorkoutWithSets {
   _count: { sets: number };
 }
 
+interface ActiveWorkout {
+  id: number;
+  type: string;
+  startedAt: string | null;
+}
+
 export default function WorkoutsPage() {
+  const [activeTab, setActiveTab] = useState<WorkoutsTab>('journal');
   const [workouts, setWorkouts] = useState<WorkoutWithSets[]>([]);
   const [loading, setLoading] = useState(true);
+  const [active, setActive] = useState<ActiveWorkout | null>(null);
+  const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    listWorkouts().then((data) => {
-      setWorkouts(data as unknown as WorkoutWithSets[]);
+    Promise.all([listWorkouts(), getActiveWorkout()]).then(([data, res]) => {
+      const all = data as unknown as WorkoutWithSets[];
+      setWorkouts(all.filter(w => w.status !== 'in_progress'));
+      if (res.workout) setActive(res.workout as unknown as ActiveWorkout);
       setLoading(false);
     });
   }, []);
+
+  // Live timer for active workout banner
+  useEffect(() => {
+    if (!active?.startedAt) return;
+    const startMs = new Date(active.startedAt).getTime();
+    const tick = () => setElapsed(Math.floor((Date.now() - startMs) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [active?.startedAt]);
+
+  const formatElapsed = (sec: number) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
 
   const formatDate = (date: string | Date) => {
     const d = new Date(date);
@@ -67,21 +99,69 @@ export default function WorkoutsPage() {
     <div className="max-w-lg mx-auto p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-text">Тренировки</h1>
-        <div className="flex gap-2">
-          <Link
-            href="/workouts/templates"
-            className="text-accent text-sm font-medium px-4 py-2 rounded-xl hover:bg-accent/10 transition-colors"
-          >
-            Шаблоны
-          </Link>
-          <Link
-            href="/workouts/new"
-            className="bg-accent text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-accent/90 transition-colors"
-          >
-            + Новая
-          </Link>
-        </div>
+        {activeTab === 'journal' && (
+          <div className="flex gap-2">
+            <Link
+              href="/workouts/templates"
+              className="text-accent text-sm font-medium px-4 py-2 rounded-xl hover:bg-accent/10 transition-colors"
+            >
+              Шаблоны
+            </Link>
+            <Link
+              href="/workouts/active"
+              className="btn-gradient text-sm px-4 py-2"
+            >
+              + Старт
+            </Link>
+          </div>
+        )}
       </div>
+
+      {/* Active workout banner */}
+      {active && (
+        <Link href="/workouts/active"
+          className="block bg-success/15 border border-success/30 rounded-2xl p-4 hover:bg-success/20 transition-colors"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-success text-lg">&#9899;</span>
+              <div>
+                <span className="text-text font-medium text-sm">{active.type}</span>
+                <span className="text-text-secondary text-xs ml-2">идёт</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-success font-mono font-bold tabular-nums text-sm">{formatElapsed(elapsed)}</span>
+              <span className="text-success text-xs font-medium">Продолжить →</span>
+            </div>
+          </div>
+        </Link>
+      )}
+
+      {/* Tabs */}
+      <div className="flex bg-card rounded-xl p-1 gap-1">
+        <button
+          onClick={() => setActiveTab('journal')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'journal' ? 'tab-active' : 'text-text-secondary'
+          }`}
+        >
+          Журнал
+        </button>
+        <button
+          onClick={() => setActiveTab('exercises')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'exercises' ? 'tab-active' : 'text-text-secondary'
+          }`}
+        >
+          Упражнения
+        </button>
+      </div>
+
+      {activeTab === 'exercises' ? (
+        <ExercisesPanel />
+      ) : (
+      <>
 
       {loading && (
         <div className="text-text-secondary text-sm text-center py-8">Загрузка...</div>
@@ -167,6 +247,8 @@ export default function WorkoutsPage() {
           </div>
         ));
       })()}
+      </>
+      )}
     </div>
   );
 }

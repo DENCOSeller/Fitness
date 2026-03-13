@@ -26,6 +26,7 @@ model User {
   workouts         Workout[]
   workoutTemplates WorkoutTemplate[]
   meals            Meal[]
+  foodEntries      FoodEntry[]
   bodyMetrics      BodyMetric[]
   bodyMeasurements BodyMeasurement[]
   healthDaily      HealthDaily[]
@@ -83,9 +84,11 @@ model Workout {
   date        DateTime @db.Date
   type        String
   status      String   @default("completed") // planned | completed
-  durationMin Int?     @map("duration_min")
+  durationMin Int?      @map("duration_min")
   note        String?
-  createdAt   DateTime @default(now()) @map("created_at")
+  startedAt   DateTime? @map("started_at")
+  endedAt     DateTime? @map("ended_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   sets WorkoutSet[]
@@ -104,8 +107,10 @@ model WorkoutSet {
   distance   Float?   // km (cardio)
   speed      Float?   // km/h (cardio)
   incline    Float?   // % (cardio)
-  heartRate  Int?     @map("heart_rate") // bpm (cardio)
-  createdAt  DateTime @default(now()) @map("created_at")
+  heartRate   Int?      @map("heart_rate") // bpm (cardio)
+  completed   Boolean   @default(false)
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   workout  Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
   exercise Exercise @relation(fields: [exerciseId], references: [id])
@@ -155,6 +160,26 @@ model Meal {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("meals")
+}
+
+model FoodEntry {
+  id                 Int      @id @default(autoincrement())
+  userId             Int      @map("user_id")
+  date               DateTime @db.Date
+  meal               String   // breakfast | lunch | dinner | snack
+  foodName           String   @map("food_name")
+  calories           Float    @default(0)
+  protein            Float    @default(0)
+  fat                Float    @default(0)
+  carbs              Float    @default(0)
+  servingDescription String?  @map("serving_description")
+  amount             Float    @default(1)
+  fatsecretFoodId    String?  @map("fatsecret_food_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("food_entries")
 }
 
 model BodyMetric {

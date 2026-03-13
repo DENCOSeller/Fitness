@@ -40,6 +40,30 @@ Chunk 7 (журнал тренировок) — готов.
 Chunk 8–20 — готовы.
 Chunk 21 (деплой на сервер) — готов.
 Chunk 24 (мультипользователи) — готов.
+Chunk 25 (активная тренировка) — готов.
+
+## Active Workout (Chunk 25)
+
+Режим live-tracking тренировки с таймером, подходами и отдыхом.
+
+### БД (миграция `20260313071856_active_workout_fields`)
+
+- `Workout`: добавлены `started_at DateTime?`, `ended_at DateTime?`. Статус `in_progress` (помимо `planned`/`completed`).
+- `WorkoutSet`: добавлены `completed Boolean @default(false)`, `completed_at DateTime?`.
+
+### Роут `/workouts/active`
+
+- **Start screen**: выбор типа → создание Workout `in_progress`
+- **Active screen**: sticky header с таймером (Date.now() based), список упражнений (accordion), sticky кнопка «Завершить»
+- **Баннер** на `/workouts`: зелёный, с живым таймером, если есть `in_progress` тренировка
+
+### Server Actions (`app/(dashboard)/workouts/active/actions.ts`)
+
+`startWorkout`, `getActiveWorkout`, `addExerciseToWorkout`, `addSetToWorkout`, `updateSet`, `completeSet`, `finishWorkout`, `discardWorkout`
+
+### Rest Timer (`components/workout/rest-timer.tsx`)
+
+Полностью переписан. Fullscreen overlay, SVG circle 200px, цвет по остатку (зелёный → жёлтый → красный), Date.now() based. Props: `{ isOpen, onClose, defaultSeconds? }`.
 
 ## Commands
 

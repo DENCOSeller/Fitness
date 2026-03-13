@@ -25,6 +25,8 @@ interface WorkoutDetail {
   status?: string;
   durationMin: number | null;
   note: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
   sets: WorkoutSet[];
 }
 
@@ -156,12 +158,21 @@ export default function WorkoutDetailPage({ params }: { params: Promise<{ id: st
           <span className="text-text-secondary text-sm">{formatDate(workout.date)}</span>
         </div>
 
-        <div className="flex gap-4 text-text-secondary text-sm">
-          {workout.durationMin && <span>{workout.durationMin} мин</span>}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-text-secondary text-sm">
+          {workout.durationMin != null && workout.durationMin > 0 && <span>{workout.durationMin} мин</span>}
           <span>{groups.length} упр.</span>
           <span>{workout.sets.length} подх.</span>
           {totalVolume > 0 && <span>{totalVolume.toLocaleString('ru-RU')} кг</span>}
         </div>
+
+        {workout.startedAt && (
+          <div className="flex gap-2 text-text-secondary text-xs mt-2">
+            <span>
+              {new Date(workout.startedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+              {workout.endedAt && ` — ${new Date(workout.endedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`}
+            </span>
+          </div>
+        )}
 
         {workout.note && (
           <p className="text-text-secondary text-sm mt-3">{workout.note}</p>

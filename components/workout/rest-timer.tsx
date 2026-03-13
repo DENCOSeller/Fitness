@@ -1,178 +1,167 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
-const DURATIONS = [30, 60, 90, 120];
+const DURATIONS = [60, 90, 120];
+const RADIUS = 90;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 interface RestTimerProps {
+  isOpen: boolean;
   onClose: () => void;
+  defaultSeconds?: number;
 }
 
-export default function RestTimer({ onClose }: RestTimerProps) {
-  const [duration, setDuration] = useState(90);
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
+function getStrokeColor(pct: number): string {
+  if (pct > 50) return '#30D158';
+  if (pct > 20) return '#FF9F0A';
+  return '#FF453A';
+}
+
+function playFinishSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    const beep = (time: number, freq: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.3, time);
+      gain.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
+      osc.start(time);
+      osc.stop(time + 0.15);
+    };
+    beep(ctx.currentTime, 880);
+    beep(ctx.currentTime + 0.2, 880);
+    beep(ctx.currentTime + 0.4, 1100);
+  } catch { /* AudioContext not available */ }
+}
+
+export default function RestTimer({ isOpen, onClose, defaultSeconds = 90 }: RestTimerProps) {
+  const [totalSeconds, setTotalSeconds] = useState(defaultSeconds);
+  const [remaining, setRemaining] = useState(defaultSeconds);
+  const startTimeRef = useRef(0);
+  const totalRef = useRef(defaultSeconds);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const finishedRef = useRef(false);
 
-  const progress = duration > 0 ? ((duration - timeLeft) / duration) * 100 : 0;
-  const radius = 54;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference * (1 - (isRunning || timeLeft === 0 ? progress : 0) / 100);
-
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${String(s).padStart(2, '0')}`;
-  };
-
-  const finish = useCallback(() => {
-    setIsRunning(false);
-    setTimeLeft(0);
+  const cleanup = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-
-    // Vibration
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate([200, 100, 200, 100, 200]);
-    }
-
-    // Sound via AudioContext
-    try {
-      const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-      const playBeep = (time: number, freq: number) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = freq;
-        osc.type = 'sine';
-        gain.gain.setValueAtTime(0.3, time);
-        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
-        osc.start(time);
-        osc.stop(time + 0.15);
-      };
-      playBeep(ctx.currentTime, 880);
-      playBeep(ctx.currentTime + 0.2, 880);
-      playBeep(ctx.currentTime + 0.4, 1100);
-    } catch {
-      // AudioContext not available
-    }
   }, []);
 
-  const start = useCallback((sec: number) => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    setDuration(sec);
-    setTimeLeft(sec);
-    setIsRunning(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isRunning || timeLeft <= 0) return;
+  const startTimer = useCallback((seconds: number) => {
+    cleanup();
+    finishedRef.current = false;
+    startTimeRef.current = Date.now();
+    totalRef.current = seconds;
+    setTotalSeconds(seconds);
+    setRemaining(seconds);
 
     intervalRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          finish();
-          return 0;
+      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      const left = Math.max(0, totalRef.current - elapsed);
+      setRemaining(left);
+
+      if (left <= 0 && !finishedRef.current) {
+        finishedRef.current = true;
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate([200, 100, 200, 100, 200]);
         }
-        return prev - 1;
-      });
-    }, 1000);
+        playFinishSound();
+      }
+    }, 250);
+  }, [cleanup]);
 
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [isRunning, timeLeft, finish]);
-
-  // Cleanup on unmount
+  // Auto-start when opened
   useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
-
-  const handleStop = () => {
-    setIsRunning(false);
-    setTimeLeft(0);
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    if (isOpen) {
+      startTimer(defaultSeconds);
+    } else {
+      cleanup();
     }
+    return cleanup;
+  }, [isOpen, defaultSeconds, startTimer, cleanup]);
+
+  const handleDurationChange = (sec: number) => {
+    startTimer(sec);
   };
 
+  const handleAddTime = () => {
+    totalRef.current += 30;
+    setTotalSeconds(totalRef.current);
+    const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+    setRemaining(Math.max(0, totalRef.current - elapsed));
+    finishedRef.current = false;
+  };
+
+  const handleSkip = () => {
+    cleanup();
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  const pct = totalSeconds > 0 ? (remaining / totalSeconds) * 100 : 0;
+  const strokeColor = getStrokeColor(pct);
+  const dashOffset = CIRCUMFERENCE * (1 - pct / 100);
+  const finished = remaining <= 0;
+
   return (
-    <div className="bg-card rounded-2xl p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <span className="text-text font-medium text-sm">Таймер отдыха</span>
-        <button
-          onClick={() => { handleStop(); onClose(); }}
-          className="text-text-secondary hover:text-text text-xs transition-colors"
-        >
-          Скрыть
-        </button>
-      </div>
-
-      {/* Circular progress + time */}
-      <div className="flex justify-center">
-        <div className="relative w-32 h-32">
-          <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-            <circle
-              cx="60" cy="60" r={radius}
-              fill="none"
-              stroke="currentColor"
-              className="text-border"
-              strokeWidth="6"
-            />
-            <circle
-              cx="60" cy="60" r={radius}
-              fill="none"
-              stroke="currentColor"
-              className="text-accent transition-all duration-1000 ease-linear"
-              strokeWidth="6"
-              strokeLinecap="round"
-              strokeDasharray={circumference}
-              strokeDashoffset={strokeDashoffset}
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-text text-3xl font-bold tabular-nums">
-              {isRunning ? formatTime(timeLeft) : formatTime(duration)}
-            </span>
-            {timeLeft === 0 && !isRunning && duration > 0 && (
-              <span className="text-accent text-xs mt-0.5">Готово!</span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Duration buttons */}
-      <div className="flex gap-2 justify-center">
-        {DURATIONS.map((sec) => (
-          <button
-            key={sec}
-            onClick={() => start(sec)}
-            className={`px-3 py-1.5 text-sm rounded-xl transition-colors ${
-              duration === sec && isRunning
-                ? 'bg-accent text-white'
-                : 'bg-bg text-text-secondary hover:text-text'
+    <div className="fixed inset-0 z-50 bg-bg/95 backdrop-blur-sm flex flex-col items-center justify-center px-4">
+      {/* Duration selector */}
+      <div className="flex gap-3 mb-10">
+        {DURATIONS.map(sec => (
+          <button key={sec} onClick={() => handleDurationChange(sec)}
+            className={`px-5 py-2 text-sm font-medium rounded-xl transition-all ${
+              totalSeconds === sec
+                ? 'bg-white/15 text-white'
+                : 'text-text-secondary hover:text-white'
             }`}
-          >
-            {sec}с
-          </button>
+          >{sec}с</button>
         ))}
       </div>
 
-      {/* Stop button when running */}
-      {isRunning && (
-        <button
-          onClick={handleStop}
-          className="w-full text-danger text-sm py-2 hover:bg-danger/10 rounded-xl transition-colors"
-        >
-          Остановить
-        </button>
+      {/* Circle + timer */}
+      <div className="relative w-52 h-52 mb-4">
+        <svg className="w-full h-full -rotate-90" viewBox="0 0 200 200">
+          <circle cx="100" cy="100" r={RADIUS}
+            fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8"
+          />
+          <circle cx="100" cy="100" r={RADIUS}
+            fill="none" stroke={strokeColor} strokeWidth="8" strokeLinecap="round"
+            strokeDasharray={CIRCUMFERENCE} strokeDashoffset={dashOffset}
+            style={{ transition: 'stroke-dashoffset 0.3s linear, stroke 0.5s ease' }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-white font-mono font-bold tabular-nums" style={{ fontSize: '72px', lineHeight: 1 }}>
+            {remaining}
+          </span>
+        </div>
+      </div>
+
+      <p className="text-text-secondary text-sm mb-10">
+        {finished ? 'Время вышло!' : 'Отдых'}
+      </p>
+
+      {/* +30s button */}
+      {!finished && (
+        <button onClick={handleAddTime}
+          className="mb-6 px-6 py-2 text-sm font-medium text-text-secondary bg-white/10 rounded-xl hover:bg-white/15 transition-colors"
+        >+30с</button>
       )}
+
+      {/* Skip / Close */}
+      <button onClick={handleSkip}
+        className="w-full max-w-xs py-3.5 text-base font-semibold rounded-2xl bg-white/10 text-white hover:bg-white/15 transition-colors"
+      >
+        {finished ? 'Закрыть' : 'Пропустить'}
+      </button>
     </div>
   );
 }

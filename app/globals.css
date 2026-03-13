@@ -1,18 +1,22 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #000000;
-  --color-card: #1C1C1E;
-  --color-card-hover: #2C2C2E;
+  --color-bg: #0D0D0F;
+  --color-card: #1A1A1E;
+  --color-card-hover: #252528;
   --color-border: #38383A;
   --color-text: #FFFFFF;
   --color-text-secondary: #8E8E93;
   --color-accent: #0A84FF;
   --color-accent-hover: #409CFF;
+  --color-violet: #BF5AF2;
+  --color-violet-hover: #D17FF7;
+  --color-cyan: #32ADE6;
   --color-danger: #FF453A;
+  --color-warning: #FF9F0A;
   --color-success: #30D158;
-  --color-glass: rgba(28, 28, 30, 0.72);
-  --color-glass-border: rgba(255, 255, 255, 0.08);
+  --color-glass: rgba(20, 20, 22, 0.78);
+  --color-glass-border: rgba(255, 255, 255, 0.06);
 }
 
 body {
@@ -21,4 +25,78 @@ body {
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Gradient button — primary action */
+.btn-gradient {
+  background: linear-gradient(135deg, #0A84FF 0%, #BF5AF2 100%);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  transition: opacity 0.2s, box-shadow 0.2s;
+}
+.btn-gradient:hover {
+  opacity: 0.9;
+  box-shadow: 0 0 20px rgba(10, 132, 255, 0.3), 0 0 40px rgba(191, 90, 242, 0.15);
+}
+.btn-gradient:disabled {
+  opacity: 0.4;
+}
+
+/* Neon glow utilities */
+.glow-accent {
+  box-shadow: 0 0 12px rgba(10, 132, 255, 0.25);
+}
+.glow-violet {
+  box-shadow: 0 0 12px rgba(191, 90, 242, 0.25);
+}
+.glow-accent-sm {
+  box-shadow: 0 0 8px rgba(10, 132, 255, 0.15);
+}
+
+/* Gradient text */
+.text-gradient {
+  background: linear-gradient(135deg, #0A84FF, #BF5AF2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Progress bar gradient */
+.progress-gradient {
+  background: linear-gradient(90deg, #0A84FF, #BF5AF2);
+}
+
+/* Card with subtle neon border on hover */
+.card-neon:hover {
+  border-color: rgba(10, 132, 255, 0.2);
+  box-shadow: 0 0 16px rgba(10, 132, 255, 0.06);
+}
+
+/* Tab active gradient indicator */
+.tab-active {
+  background: linear-gradient(135deg, #0A84FF, #BF5AF2);
+  color: #fff;
+}
+
+/* Bottomsheet slide-up animation */
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.25s ease-out;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #2C2E33;
+  border-radius: 2px;
 }

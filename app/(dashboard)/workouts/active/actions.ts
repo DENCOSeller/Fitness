@@ -164,7 +164,7 @@ export async function addExerciseToWorkout(workoutId: number, exerciseId: number
 export async function addSetToWorkout(
   workoutId: number,
   exerciseId: number,
-  data: { reps: number; weight: number },
+  data: { reps: number; weight: number; duration?: number; speed?: number; incline?: number; distance?: number },
 ) {
   const userId = await getCurrentUserId();
 
@@ -188,6 +188,10 @@ export async function addSetToWorkout(
       setOrder: lastSet.setOrder + 1,
       reps: data.reps,
       weight: data.weight,
+      duration: data.duration ?? null,
+      speed: data.speed ?? null,
+      incline: data.incline ?? null,
+      distance: data.distance ?? null,
       completed: false,
     },
     include: { exercise: true },
@@ -196,7 +200,10 @@ export async function addSetToWorkout(
   return { set };
 }
 
-export async function updateSet(setId: number, data: { reps: number; weight: number }) {
+export async function updateSet(
+  setId: number,
+  data: { reps: number; weight: number; duration?: number; speed?: number; incline?: number; distance?: number },
+) {
   const userId = await getCurrentUserId();
 
   const set = await prisma.workoutSet.findUnique({
@@ -209,11 +216,38 @@ export async function updateSet(setId: number, data: { reps: number; weight: num
 
   const updated = await prisma.workoutSet.update({
     where: { id: setId },
-    data: { reps: data.reps, weight: data.weight },
+    data: {
+      reps: data.reps,
+      weight: data.weight,
+      duration: data.duration ?? null,
+      speed: data.speed ?? null,
+      incline: data.incline ?? null,
+      distance: data.distance ?? null,
+    },
     include: { exercise: true },
   });
 
   return { set: updated };
+}
+
+export async function startSet(setId: number) {
+  const userId = await getCurrentUserId();
+
+  const set = await prisma.workoutSet.findUnique({
+    where: { id: setId },
+    include: { workout: true },
+  });
+  if (!set || set.workout.userId !== userId) {
+    return { error: 'Подход не найден' };
+  }
+  if (set.setStartedAt) return { success: true };
+
+  await prisma.workoutSet.update({
+    where: { id: setId },
+    data: { setStartedAt: new Date() },
+  });
+
+  return { success: true };
 }
 
 export async function completeSet(setId: number) {
@@ -227,9 +261,15 @@ export async function completeSet(setId: number) {
     return { error: 'Подход не найден' };
   }
 
+  const now = new Date();
   const updated = await prisma.workoutSet.update({
     where: { id: setId },
-    data: { completed: true, completedAt: new Date() },
+    data: {
+      completed: true,
+      completedAt: now,
+      setEndedAt: now,
+      setStartedAt: set.setStartedAt ?? now,
+    },
     include: { exercise: true },
   });
 
@@ -278,5 +318,43 @@ export async function discardWorkout(workoutId: number) {
   }
 
   await prisma.workout.delete({ where: { id: workoutId } });
+  return { success: true };
+}
+
+export async function replaceExerciseInWorkout(
+  workoutId: number,
+  oldExerciseId: number,
+  newExerciseId: number,
+) {
+  const userId = await getCurrentUserId();
+
+  const workout = await prisma.workout.findUnique({ where: { id: workoutId } });
+  if (!workout || workout.userId !== userId || workout.status !== 'in_progress') {
+    return { error: 'Тренировка не найдена или уже завершена' };
+  }
+
+  await prisma.workoutSet.updateMany({
+    where: { workoutId, exerciseId: oldExerciseId },
+    data: { exerciseId: newExerciseId },
+  });
+
+  return { success: true };
+}
+
+export async function removeExerciseFromWorkout(
+  workoutId: number,
+  exerciseId: number,
+) {
+  const userId = await getCurrentUserId();
+
+  const workout = await prisma.workout.findUnique({ where: { id: workoutId } });
+  if (!workout || workout.userId !== userId || workout.status !== 'in_progress') {
+    return { error: 'Тренировка не найдена или уже завершена' };
+  }
+
+  await prisma.workoutSet.deleteMany({
+    where: { workoutId, exerciseId },
+  });
+
   return { success: true };
 }

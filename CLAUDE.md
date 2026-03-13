@@ -57,9 +57,30 @@ Chunk 25 (активная тренировка) — готов.
 - **Active screen**: sticky header с таймером (Date.now() based), список упражнений (accordion), sticky кнопка «Завершить»
 - **Баннер** на `/workouts`: зелёный, с живым таймером, если есть `in_progress` тренировка
 
+### WorkoutSet — кардио и трекинг полей (миграция `20260313100412_add_set_timing_fields`)
+
+- `set_started_at DateTime?` — момент фокуса на инпуте подхода (onFocus → `startSet()`)
+- `set_ended_at DateTime?` — момент нажатия ✓ (`completeSet()`)
+- Кардио поля (были в схеме): `duration Int?`, `speed Float?`, `incline Float?`, `distance Float?`
+
+Данные для AI тренера: время подхода (`setEndedAt - setStartedAt`), реальное время отдыха (`set[n].setStartedAt - set[n-1].setEndedAt`).
+
+### Кардио в активном режиме
+
+Для `exercise.type === 'cardio'` — 4 поля в 2 строки:
+- Строка 1: Длит.(мин) | Скор.(км/ч) | ✓
+- Строка 2: Наклон(%) | Дист.(км)
+
+Сводка свёрнутого: `"20мин 8км/ч"`. План-хинт: `"План: 3 подх. × 20 мин"`.
+
+### Управление упражнениями в активном режиме
+
+- Кнопка `i` в header → bottomsheet с инфо (название, группа мышц, описание) + "Заменить упражнение" → ExercisePicker
+- Кнопка `✕` в header → двойное нажатие для подтверждения → удаление всех сетов упражнения
+
 ### Server Actions (`app/(dashboard)/workouts/active/actions.ts`)
 
-`startWorkout`, `getActiveWorkout`, `addExerciseToWorkout`, `addSetToWorkout`, `updateSet`, `completeSet`, `finishWorkout`, `discardWorkout`
+`startWorkout`, `getActiveWorkout`, `addExerciseToWorkout`, `addSetToWorkout`, `updateSet`, `startSet`, `completeSet`, `finishWorkout`, `discardWorkout`, `replaceExerciseInWorkout`, `removeExerciseFromWorkout`
 
 ### Rest Timer (`components/workout/rest-timer.tsx`)
 

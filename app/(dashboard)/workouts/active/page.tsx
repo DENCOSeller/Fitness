@@ -4,7 +4,8 @@ import { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   startWorkout, getActiveWorkout, addExerciseToWorkout,
-  addSetToWorkout, updateSet, completeSet, finishWorkout, discardWorkout,
+  addSetToWorkout, updateSet, startSet, completeSet, finishWorkout, discardWorkout,
+  replaceExerciseInWorkout, removeExerciseFromWorkout,
 } from './actions';
 import { getExercises } from '../../exercises/actions';
 import { createExerciseFromWorkout } from '../actions';
@@ -16,6 +17,7 @@ interface Exercise {
   name: string;
   muscleGroup: string;
   type?: string;
+  description?: string | null;
 }
 
 interface SetData {
@@ -24,6 +26,10 @@ interface SetData {
   setOrder: number;
   reps: number;
   weight: number;
+  duration: number | null;
+  speed: number | null;
+  incline: number | null;
+  distance: number | null;
   completed: boolean;
   exercise: Exercise;
 }
@@ -50,6 +56,15 @@ interface ExGroup {
   allDone: boolean;
 }
 
+interface CardioEdits {
+  duration: number;
+  speed: number;
+  incline: number;
+  distance: number;
+}
+
+type LocalEdit = { reps: number; weight: number } & Partial<CardioEdits>;
+
 const TYPES = ['Силовая', 'Кардио', 'Растяжка', 'Своё'];
 
 function formatTimer(sec: number): string {
@@ -74,8 +89,19 @@ function groupSets(sets: SetData[]): ExGroup[] {
   return groups;
 }
 
-function exerciseSummary(sets: SetData[]): string {
+function exerciseSummary(sets: SetData[], type?: string): string {
   if (sets.length === 0) return '';
+  if (type === 'cardio') {
+    const parts: string[] = [];
+    for (const s of sets) {
+      const dur = s.duration ?? 0;
+      const spd = s.speed ?? 0;
+      let t = `${dur}мин`;
+      if (spd) t += ` ${spd}км/ч`;
+      parts.push(t);
+    }
+    return parts.join(', ');
+  }
   const weights = [...new Set(sets.map(s => s.weight))];
   if (weights.length === 1) {
     const reps = sets.map(s => s.reps).join('/');
@@ -98,9 +124,16 @@ export default function ActiveWorkoutPage() {
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [error, setError] = useState('');
-  const [localEdits, setLocalEdits] = useState<Record<number, { reps: number; weight: number }>>({});
+  const [localEdits, setLocalEdits] = useState<Record<number, LocalEdit>>({});
   const [planData, setPlanData] = useState<Map<number, { plannedSets: number; plannedReps: number; plannedWeight: number; restSeconds: number }>>(new Map());
   const [timerSeconds, setTimerSeconds] = useState(90);
+  // Task 2: info modal
+  const [infoExercise, setInfoExercise] = useState<Exercise | null>(null);
+  const [replaceExId, setReplaceExId] = useState<number | null>(null);
+  // Task 3: delete confirmation
+  const [confirmDeleteExId, setConfirmDeleteExId] = useState<number | null>(null);
+  // Task 4: set timing — track which sets already had startSet called
+  const [startedSets, setStartedSets] = useState<Set<number>>(new Set());
 
   // Load active workout
   useEffect(() => {
@@ -108,7 +141,6 @@ export default function ActiveWorkoutPage() {
       if (res.workout) {
         const w = res.workout as unknown as WorkoutData;
         setWorkout(w);
-        // Build planData map: exerciseId → plan info
         if (w.planExercises && w.planExercises.length > 0) {
           const m = new Map<number, { plannedSets: number; plannedReps: number; plannedWeight: number; restSeconds: number }>();
           for (const pe of w.planExercises) {
@@ -129,7 +161,7 @@ export default function ActiveWorkoutPage() {
     });
   }, []);
 
-  // Live timer — Date.now() based, survives tab throttling
+  // Live timer
   useEffect(() => {
     if (!workout?.startedAt) return;
     const startMs = new Date(workout.startedAt).getTime();
@@ -157,7 +189,6 @@ export default function ActiveWorkoutPage() {
     if (edited !== undefined && edited !== null) return edited;
     const orig = set[field];
     if (orig !== undefined && orig !== null && orig !== 0) return orig;
-    // Fallback to plan data
     const plan = planData.get(set.exerciseId);
     if (plan) {
       const planVal = field === 'reps' ? plan.plannedReps : plan.plannedWeight;
@@ -166,12 +197,24 @@ export default function ActiveWorkoutPage() {
     return '';
   };
 
-  const setLocal = (setId: number, field: 'reps' | 'weight', value: number, orig: SetData) => {
+  const getCardioVal = (set: SetData, field: keyof CardioEdits): number | string => {
+    const edited = localEdits[set.id]?.[field];
+    if (edited !== undefined && edited !== null && edited !== 0) return edited;
+    const orig = set[field];
+    if (orig !== undefined && orig !== null && orig !== 0) return orig;
+    return '';
+  };
+
+  const setLocal = (setId: number, field: string, value: number, orig: SetData) => {
     setLocalEdits(prev => ({
       ...prev,
       [setId]: {
         reps: field === 'reps' ? value : (prev[setId]?.reps ?? orig.reps),
         weight: field === 'weight' ? value : (prev[setId]?.weight ?? orig.weight),
+        duration: field === 'duration' ? value : (prev[setId]?.duration ?? orig.duration ?? 0),
+        speed: field === 'speed' ? value : (prev[setId]?.speed ?? orig.speed ?? 0),
+        incline: field === 'incline' ? value : (prev[setId]?.incline ?? orig.incline ?? 0),
+        distance: field === 'distance' ? value : (prev[setId]?.distance ?? orig.distance ?? 0),
       },
     }));
   };
@@ -179,6 +222,12 @@ export default function ActiveWorkoutPage() {
   const reloadWorkout = async () => {
     const res = await getActiveWorkout();
     if (res.workout) setWorkout(res.workout as unknown as WorkoutData);
+  };
+
+  const handleSetFocus = (setId: number) => {
+    if (startedSets.has(setId)) return;
+    setStartedSets(prev => new Set(prev).add(setId));
+    startSet(setId);
   };
 
   // --- Actions ---
@@ -197,6 +246,20 @@ export default function ActiveWorkoutPage() {
 
   const handleSelectExercise = (ex: Exercise) => {
     if (!workout) return;
+    // Replace mode
+    if (replaceExId !== null) {
+      const oldId = replaceExId;
+      setReplaceExId(null);
+      setShowPicker(false);
+      setInfoExercise(null);
+      startTransition(async () => {
+        const res = await replaceExerciseInWorkout(workout.id, oldId, ex.id);
+        if (res.error) { showErr(res.error); return; }
+        await reloadWorkout();
+      });
+      return;
+    }
+    // Normal add
     setShowPicker(false);
     startTransition(async () => {
       const res = await addExerciseToWorkout(workout.id, ex.id);
@@ -219,7 +282,15 @@ export default function ActiveWorkoutPage() {
     if (!workout) return;
     const exSets = workout.sets.filter(s => s.exercise.id === exerciseId);
     const last = exSets[exSets.length - 1];
-    const vals = localEdits[last?.id] || { reps: last?.reps || 0, weight: last?.weight || 0 };
+    const edit = localEdits[last?.id];
+    const vals = {
+      reps: edit?.reps ?? last?.reps ?? 0,
+      weight: edit?.weight ?? last?.weight ?? 0,
+      duration: edit?.duration ?? last?.duration ?? undefined,
+      speed: edit?.speed ?? last?.speed ?? undefined,
+      incline: edit?.incline ?? last?.incline ?? undefined,
+      distance: edit?.distance ?? last?.distance ?? undefined,
+    };
     startTransition(async () => {
       const res = await addSetToWorkout(workout.id, exerciseId, vals);
       if (res.error) { showErr(res.error); return; }
@@ -228,30 +299,45 @@ export default function ActiveWorkoutPage() {
   };
 
   const handleCompleteSet = (set: SetData) => {
-    // Resolve values: localEdits → original → plan fallback
     const plan = planData.get(set.exerciseId);
-    const reps = localEdits[set.id]?.reps ?? (set.reps || plan?.plannedReps || 0);
-    const weight = localEdits[set.id]?.weight ?? (set.weight || plan?.plannedWeight || 0);
-    const vals = { reps, weight };
-    if (vals.reps <= 0) { showErr('Укажите повторения'); return; }
-    startTransition(async () => {
-      await updateSet(set.id, vals);
-      await completeSet(set.id);
-      setWorkout(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          sets: prev.sets.map(s =>
-            s.id === set.id ? { ...s, ...vals, completed: true } : s
-          ),
-        };
+    const isCardio = set.exercise.type === 'cardio';
+    const edit = localEdits[set.id];
+
+    if (isCardio) {
+      const duration = edit?.duration ?? set.duration ?? 0;
+      const speed = edit?.speed ?? set.speed ?? 0;
+      const incline = edit?.incline ?? set.incline ?? 0;
+      const distance = edit?.distance ?? set.distance ?? 0;
+      if (duration <= 0 && speed <= 0) { showErr('Укажите длительность или скорость'); return; }
+      const vals = { reps: 0, weight: 0, duration, speed, incline, distance };
+      startTransition(async () => {
+        await updateSet(set.id, vals);
+        await completeSet(set.id);
+        setWorkout(prev => {
+          if (!prev) return prev;
+          return { ...prev, sets: prev.sets.map(s => s.id === set.id ? { ...s, ...vals, completed: true } : s) };
+        });
+        setLocalEdits(prev => { const next = { ...prev }; delete next[set.id]; return next; });
+        setTimerSeconds(plan?.restSeconds ?? 90);
+        setShowTimer(true);
       });
-      setLocalEdits(prev => { const next = { ...prev }; delete next[set.id]; return next; });
-      // Use plan rest time if available
-      const restSec = plan?.restSeconds ?? 90;
-      setTimerSeconds(restSec);
-      setShowTimer(true);
-    });
+    } else {
+      const reps = edit?.reps ?? (set.reps || plan?.plannedReps || 0);
+      const weight = edit?.weight ?? (set.weight || plan?.plannedWeight || 0);
+      if (reps <= 0) { showErr('Укажите повторения'); return; }
+      const vals = { reps, weight };
+      startTransition(async () => {
+        await updateSet(set.id, vals);
+        await completeSet(set.id);
+        setWorkout(prev => {
+          if (!prev) return prev;
+          return { ...prev, sets: prev.sets.map(s => s.id === set.id ? { ...s, ...vals, completed: true } : s) };
+        });
+        setLocalEdits(prev => { const next = { ...prev }; delete next[set.id]; return next; });
+        setTimerSeconds(plan?.restSeconds ?? 90);
+        setShowTimer(true);
+      });
+    }
   };
 
   const handleFinish = () => {
@@ -273,9 +359,108 @@ export default function ActiveWorkoutPage() {
     });
   };
 
+  const handleDeleteExercise = (exerciseId: number) => {
+    if (confirmDeleteExId !== exerciseId) {
+      setConfirmDeleteExId(exerciseId);
+      setTimeout(() => setConfirmDeleteExId(null), 3000);
+      return;
+    }
+    if (!workout) return;
+    setConfirmDeleteExId(null);
+    startTransition(async () => {
+      const res = await removeExerciseFromWorkout(workout.id, exerciseId);
+      if (res.error) { showErr(res.error); return; }
+      await reloadWorkout();
+    });
+  };
+
   const toggleCollapse = (id: number) => {
     setCollapsed(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
+
+  // --- Render helpers ---
+
+  const checkIcon = (
+    <svg className="w-5 h-5 text-success" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+    </svg>
+  );
+
+  const checkIconSmall = (
+    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+    </svg>
+  );
+
+  const renderCompleteBtn = (set: SetData) => set.completed ? (
+    <div className="w-10 h-10 shrink-0 flex items-center justify-center">{checkIcon}</div>
+  ) : (
+    <button onClick={() => handleCompleteSet(set)} disabled={isPending}
+      className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg bg-success/15 text-success hover:bg-success/25 transition-colors disabled:opacity-30"
+    >{checkIconSmall}</button>
+  );
+
+  const inputCls = "flex-1 min-w-0 bg-bg border border-border rounded-lg px-1 py-1.5 text-sm text-text text-center focus:border-accent outline-none disabled:opacity-50";
+
+  const renderStrengthSet = (set: SetData, idx: number) => (
+    <div key={set.id} className={`flex items-center gap-1.5 w-full px-2 overflow-hidden ${set.completed ? 'opacity-40' : ''}`}>
+      <span className="w-5 shrink-0 text-text-secondary text-xs text-center">{idx + 1}</span>
+      <input type="number" inputMode="numeric" placeholder="0"
+        value={getVal(set, 'reps')} disabled={set.completed}
+        onFocus={() => handleSetFocus(set.id)}
+        onChange={e => setLocal(set.id, 'reps', parseInt(e.target.value) || 0, set)}
+        className={inputCls}
+      />
+      <span className="shrink-0 text-text-secondary text-xs px-1">x</span>
+      <input type="number" inputMode="decimal" placeholder="0"
+        value={getVal(set, 'weight')} disabled={set.completed}
+        onFocus={() => handleSetFocus(set.id)}
+        onChange={e => setLocal(set.id, 'weight', parseFloat(e.target.value) || 0, set)}
+        className={inputCls}
+      />
+      {renderCompleteBtn(set)}
+    </div>
+  );
+
+  const renderCardioSet = (set: SetData, idx: number) => (
+    <div key={set.id} className={`space-y-1 px-2 ${set.completed ? 'opacity-40' : ''}`}>
+      {/* Row 1: duration | speed | check */}
+      <div className="flex items-center gap-1.5 w-full overflow-hidden">
+        <span className="w-5 shrink-0 text-text-secondary text-xs text-center">{idx + 1}</span>
+        <input type="number" inputMode="decimal" placeholder="0"
+          value={getCardioVal(set, 'duration')} disabled={set.completed}
+          onFocus={() => handleSetFocus(set.id)}
+          onChange={e => setLocal(set.id, 'duration', parseInt(e.target.value) || 0, set)}
+          className={inputCls}
+        />
+        <span className="shrink-0 text-text-secondary text-xs px-1">|</span>
+        <input type="number" inputMode="decimal" placeholder="0"
+          value={getCardioVal(set, 'speed')} disabled={set.completed}
+          onFocus={() => handleSetFocus(set.id)}
+          onChange={e => setLocal(set.id, 'speed', parseFloat(e.target.value) || 0, set)}
+          className={inputCls}
+        />
+        {renderCompleteBtn(set)}
+      </div>
+      {/* Row 2: incline | distance */}
+      <div className="flex items-center gap-1.5 w-full overflow-hidden pl-7">
+        <input type="number" inputMode="decimal" placeholder="0"
+          value={getCardioVal(set, 'incline')} disabled={set.completed}
+          onFocus={() => handleSetFocus(set.id)}
+          onChange={e => setLocal(set.id, 'incline', parseFloat(e.target.value) || 0, set)}
+          className={inputCls}
+        />
+        <span className="shrink-0 text-text-secondary text-xs px-1">|</span>
+        <input type="number" inputMode="decimal" placeholder="0"
+          value={getCardioVal(set, 'distance')} disabled={set.completed}
+          onFocus={() => handleSetFocus(set.id)}
+          onChange={e => setLocal(set.id, 'distance', parseFloat(e.target.value) || 0, set)}
+          className={inputCls}
+        />
+        <span className="w-10 shrink-0" />
+      </div>
+    </div>
+  );
 
   // --- Render ---
 
@@ -312,6 +497,7 @@ export default function ActiveWorkoutPage() {
   // Active workout
   const groups = groupSets(workout.sets);
   const completedSets = workout.sets.filter(s => s.completed).length;
+  const isCardioEx = (ex: Exercise) => ex.type === 'cardio';
 
   return (
     <div className="min-h-screen pb-[160px] overflow-x-hidden">
@@ -327,7 +513,7 @@ export default function ActiveWorkoutPage() {
           </div>
           <button onClick={handleDiscard}
             className={`ml-3 text-xs px-2.5 py-1.5 rounded-lg transition-colors flex-shrink-0 ${confirmDiscard ? 'bg-danger text-white' : 'text-text-secondary hover:text-danger'}`}
-          >{confirmDiscard ? 'Точно?' : '✕'}</button>
+          >{confirmDiscard ? 'Точно?' : '\u2715'}</button>
         </div>
       </div>
 
@@ -344,12 +530,13 @@ export default function ActiveWorkoutPage() {
         )}
 
         {groups.map(group => {
-          const isCollapsed = collapsed.has(group.exercise.id);
+          const isCollapsed_ = collapsed.has(group.exercise.id);
+          const cardio = isCardioEx(group.exercise);
           return (
             <div key={group.exercise.id} className={`rounded-2xl overflow-hidden ${group.allDone && group.sets.length > 0 ? 'bg-card/60' : 'bg-card border border-border'}`}>
-              {/* Exercise header — tap to toggle */}
-              <button onClick={() => toggleCollapse(group.exercise.id)} className="w-full px-4 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0">
+              {/* Exercise header */}
+              <div className="w-full px-4 py-3 flex items-center justify-between">
+                <button onClick={() => toggleCollapse(group.exercise.id)} className="flex items-center gap-2 min-w-0 flex-1">
                   {group.allDone && group.sets.length > 0 && (
                     <svg className="w-4 h-4 text-success flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
@@ -357,67 +544,73 @@ export default function ActiveWorkoutPage() {
                   )}
                   <span className="text-text font-medium text-sm truncate">{group.exercise.name}</span>
                   <span className="text-text-secondary text-xs flex-shrink-0">{group.exercise.muscleGroup}</span>
+                </button>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {isCollapsed_ && <span className="text-text-secondary text-xs mr-1">{exerciseSummary(group.sets, group.exercise.type)}</span>}
+                  {/* Info button */}
+                  <button onClick={(e) => { e.stopPropagation(); setInfoExercise(group.exercise); }}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-text-secondary hover:text-accent hover:bg-accent/10 transition-colors text-sm"
+                  >i</button>
+                  {/* Delete button */}
+                  <button onClick={(e) => { e.stopPropagation(); handleDeleteExercise(group.exercise.id); }}
+                    className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors text-xs ${confirmDeleteExId === group.exercise.id ? 'bg-danger text-white' : 'text-text-secondary hover:text-danger'}`}
+                  >{confirmDeleteExId === group.exercise.id ? '?' : '\u2715'}</button>
+                  {/* Collapse arrow */}
+                  <button onClick={() => toggleCollapse(group.exercise.id)} className="w-7 h-7 flex items-center justify-center">
+                    <svg className={`w-4 h-4 text-text-secondary transition-transform ${isCollapsed_ ? '' : 'rotate-180'}`} fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                    </svg>
+                  </button>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {isCollapsed && <span className="text-text-secondary text-xs">{exerciseSummary(group.sets)}</span>}
-                  <svg className={`w-4 h-4 text-text-secondary transition-transform ${isCollapsed ? '' : 'rotate-180'}`} fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                  </svg>
-                </div>
-              </button>
+              </div>
 
               {/* Sets */}
-              {!isCollapsed && (
+              {!isCollapsed_ && (
                 <div className="pb-4 space-y-2 overflow-hidden">
                   {/* Plan hint */}
                   {planData.has(group.exercise.id) && (() => {
                     const p = planData.get(group.exercise.id)!;
                     return (
                       <div className="px-4 pb-1 text-xs text-gray-500">
-                        План: {p.plannedSets} × {p.plannedReps} повт.{p.plannedWeight ? ` × ${p.plannedWeight} кг` : ''}
+                        {cardio
+                          ? `План: ${p.plannedSets} подх. × ${p.plannedReps} мин`
+                          : `План: ${p.plannedSets} × ${p.plannedReps} повт.${p.plannedWeight ? ` × ${p.plannedWeight} кг` : ''}`
+                        }
                       </div>
                     );
                   })()}
-                  <div className="flex items-center gap-1.5 text-text-secondary text-xs px-3 overflow-hidden">
-                    <span className="w-5 shrink-0 text-center">#</span>
-                    <span className="flex-1 min-w-0 text-center">Повт.</span>
-                    <span className="shrink-0 px-0.5" />
-                    <span className="flex-1 min-w-0 text-center">Вес (кг)</span>
-                    <span className="w-10 shrink-0" />
-                  </div>
 
-                  {group.sets.map((set, idx) => (
-                    <div key={set.id} className={`flex items-center gap-1.5 px-2 overflow-hidden ${set.completed ? 'opacity-40' : ''}`}>
-                      <span className="w-5 shrink-0 text-text-secondary text-xs text-center">{idx + 1}</span>
-                      <input type="number" inputMode="numeric" placeholder="0"
-                        value={getVal(set, 'reps')} disabled={set.completed}
-                        onChange={e => setLocal(set.id, 'reps', parseInt(e.target.value) || 0, set)}
-                        className="flex-1 min-w-0 bg-bg border border-border rounded-lg px-1 py-1.5 text-sm text-text text-center focus:border-accent outline-none disabled:opacity-50"
-                      />
-                      <span className="shrink-0 text-text-secondary text-xs px-0.5">x</span>
-                      <input type="number" inputMode="decimal" placeholder="0"
-                        value={getVal(set, 'weight')} disabled={set.completed}
-                        onChange={e => setLocal(set.id, 'weight', parseFloat(e.target.value) || 0, set)}
-                        className="flex-1 min-w-0 bg-bg border border-border rounded-lg px-1 py-1.5 text-sm text-text text-center focus:border-accent outline-none disabled:opacity-50"
-                      />
-                      {set.completed ? (
-                        <div className="w-10 h-10 shrink-0 flex items-center justify-center">
-                          <svg className="w-5 h-5 text-success" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                      ) : (
-                        <button onClick={() => handleCompleteSet(set)}
-                          disabled={isPending}
-                          className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg bg-success/15 text-success hover:bg-success/25 transition-colors disabled:opacity-30"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      )}
+                  {/* Column headers */}
+                  {cardio ? (
+                    <>
+                      <div className="flex items-center gap-1.5 text-text-secondary text-xs px-2 w-full overflow-hidden">
+                        <span className="w-5 shrink-0 text-center">#</span>
+                        <span className="flex-1 min-w-0 text-center">Длит.(мин)</span>
+                        <span className="shrink-0 px-1" />
+                        <span className="flex-1 min-w-0 text-center">Скор.(км/ч)</span>
+                        <span className="w-10 shrink-0" />
+                      </div>
+                      <div className="flex items-center gap-1.5 text-text-secondary text-xs px-2 w-full overflow-hidden pl-9">
+                        <span className="flex-1 min-w-0 text-center">Наклон(%)</span>
+                        <span className="shrink-0 px-1" />
+                        <span className="flex-1 min-w-0 text-center">Дист.(км)</span>
+                        <span className="w-10 shrink-0" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-text-secondary text-xs px-2 w-full overflow-hidden">
+                      <span className="w-5 shrink-0 text-center">#</span>
+                      <span className="flex-1 min-w-0 text-center">Повт.</span>
+                      <span className="shrink-0 px-1" />
+                      <span className="flex-1 min-w-0 text-center">Вес (кг)</span>
+                      <span className="w-10 shrink-0" />
                     </div>
-                  ))}
+                  )}
+
+                  {/* Set rows */}
+                  {group.sets.map((set, idx) =>
+                    cardio ? renderCardioSet(set, idx) : renderStrengthSet(set, idx)
+                  )}
 
                   <div className="flex gap-2 pt-1 px-2">
                     <button onClick={() => handleAddSet(group.exercise.id)} disabled={isPending}
@@ -438,7 +631,7 @@ export default function ActiveWorkoutPage() {
           );
         })}
 
-        <button onClick={() => setShowPicker(true)}
+        <button onClick={() => { setReplaceExId(null); setShowPicker(true); }}
           className="w-full bg-card hover:bg-card-hover border border-border border-dashed rounded-2xl py-4 text-accent text-sm transition-colors">
           + Добавить упражнение
         </button>
@@ -464,8 +657,40 @@ export default function ActiveWorkoutPage() {
           exercises={allExercises}
           onSelect={handleSelectExercise}
           onCreateNew={handleCreateExercise}
-          onClose={() => setShowPicker(false)}
+          onClose={() => { setShowPicker(false); setReplaceExId(null); }}
         />
+      )}
+
+      {/* Exercise info modal */}
+      {infoExercise && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center" onClick={() => setInfoExercise(null)}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative w-full max-w-lg bg-card rounded-t-2xl p-5 space-y-4 animate-slide-up" onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 bg-border rounded-full mx-auto" />
+            <div>
+              <h3 className="text-lg font-bold text-text">{infoExercise.name}</h3>
+              <p className="text-text-secondary text-sm">{infoExercise.muscleGroup}</p>
+            </div>
+            {infoExercise.description && (
+              <p className="text-text-secondary text-sm">{infoExercise.description}</p>
+            )}
+            <button
+              onClick={() => {
+                setReplaceExId(infoExercise.id);
+                setInfoExercise(null);
+                setShowPicker(true);
+              }}
+              className="w-full py-3 bg-accent/15 text-accent font-medium rounded-xl hover:bg-accent/25 transition-colors text-sm"
+            >
+              Заменить упражнение
+            </button>
+            <button onClick={() => setInfoExercise(null)}
+              className="w-full py-3 text-text-secondary text-sm hover:text-text transition-colors"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

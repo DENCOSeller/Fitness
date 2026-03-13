@@ -66,6 +66,10 @@ interface LastWeight {
 interface LocalSet {
   reps: number;
   weight: number;
+  duration?: number;
+  speed?: number;
+  incline?: number;
+  distance?: number;
 }
 
 // ─── Plan Preview Component ───
@@ -157,6 +161,7 @@ function PlanPreview({
     // by filtering in render
   };
 
+  const [addedExercises, setAddedExercises] = useState<PlanExercise[]>([]);
   const [removedIds, setRemovedIds] = useState<Set<number>>(new Set());
   const handleRemoveExerciseUI = (peId: number) => {
     setRemovedIds((prev) => new Set(prev).add(peId));
@@ -175,7 +180,7 @@ function PlanPreview({
       startTransition(async () => {
         const res = await addExerciseToPlan(workout.id, exercise.id);
         if (res.planExercise) {
-          const pe = res.planExercise;
+          const pe = res.planExercise as unknown as PlanExercise;
           setLocalSets((prev) => ({
             ...prev,
             [pe.id]: Array.from({ length: pe.plannedSets }, () => ({
@@ -183,6 +188,7 @@ function PlanPreview({
               weight: pe.plannedWeight ?? 0,
             })),
           }));
+          setAddedExercises((prev) => [...prev, pe]);
         }
       });
       setShowPicker(false);
@@ -207,7 +213,11 @@ function PlanPreview({
     onStart(overrides);
   };
 
-  const visibleExercises = planExercises.filter((pe) => !removedIds.has(pe.id));
+  const allExercises = [
+    ...planExercises,
+    ...addedExercises.filter((ae) => !planExercises.some((pe) => pe.id === ae.id)),
+  ];
+  const visibleExercises = allExercises.filter((pe) => !removedIds.has(pe.id));
 
   const formatDate = (date: string | Date) => {
     const d = new Date(date);
@@ -288,85 +298,157 @@ function PlanPreview({
             <div className="space-y-2">
               {/* Header row */}
               {exType === 'timed' ? (
-                <div className="flex items-center gap-2 text-text-secondary text-xs px-1">
-                  <span className="w-6 text-center">#</span>
-                  <span className="flex-1 text-center">Длительность (сек)</span>
-                  <span className="w-7" />
+                <div className="flex items-center gap-1.5 text-text-secondary text-xs px-2 w-full overflow-hidden">
+                  <span className="w-5 shrink-0 text-center">#</span>
+                  <span className="flex-1 min-w-0 text-center">Длительность (сек)</span>
+                  <span className="w-8 shrink-0" />
                 </div>
               ) : exType === 'cardio' ? (
-                <div className="flex items-center gap-2 text-text-secondary text-xs px-1">
-                  <span className="w-6 text-center">#</span>
-                  <span className="flex-1 text-center">Длит.(мин)</span>
-                  <span className="w-4" />
-                  <span className="flex-1 text-center">Скор.(км/ч)</span>
-                  <span className="w-7" />
-                </div>
+                <>
+                  <div className="flex items-center gap-1.5 text-text-secondary text-xs px-2 w-full overflow-hidden">
+                    <span className="w-5 shrink-0 text-center">#</span>
+                    <span className="flex-1 min-w-0 text-center">Длит.(мин)</span>
+                    <span className="shrink-0 px-1" />
+                    <span className="flex-1 min-w-0 text-center">Скор.(км/ч)</span>
+                    <span className="w-8 shrink-0" />
+                  </div>
+                  <div className="flex items-center gap-1.5 text-text-secondary text-xs px-2 w-full overflow-hidden pl-7">
+                    <span className="flex-1 min-w-0 text-center">Наклон(%)</span>
+                    <span className="shrink-0 px-1" />
+                    <span className="flex-1 min-w-0 text-center">Дист.(км)</span>
+                    <span className="w-8 shrink-0" />
+                  </div>
+                </>
               ) : (
-                <div className="flex items-center gap-2 text-text-secondary text-xs px-1">
-                  <span className="w-6 text-center">#</span>
-                  <span className="flex-1 text-center">Повт.</span>
-                  <span className="w-4" />
-                  <span className="flex-1 text-center">{exType === 'bodyweight' ? 'Утяж. кг' : 'Вес кг'}</span>
-                  <span className="w-7" />
+                <div className="flex items-center gap-1.5 text-text-secondary text-xs px-2 w-full overflow-hidden">
+                  <span className="w-5 shrink-0 text-center">#</span>
+                  <span className="flex-1 min-w-0 text-center">Повт.</span>
+                  <span className="shrink-0 px-1" />
+                  <span className="flex-1 min-w-0 text-center">{exType === 'bodyweight' ? 'Утяж. кг' : 'Вес кг'}</span>
+                  <span className="w-8 shrink-0" />
                 </div>
               )}
 
-              {sets.map((set, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <span className="text-text-secondary text-xs w-6 text-center">
-                    {idx + 1}
-                  </span>
-                  {exType === 'timed' ? (
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      value={set.reps || ''}
-                      placeholder="сек"
-                      onChange={(e) =>
-                        updateSet(pe.id, idx, { reps: parseInt(e.target.value) || 0 })
-                      }
-                      className="flex-1 bg-bg border border-border rounded-lg px-2 py-2 text-sm text-text text-center focus:border-accent outline-none"
-                    />
-                  ) : (
-                    <>
-                      <input
-                        type="number"
-                        inputMode={exType === 'cardio' ? 'decimal' : 'numeric'}
-                        value={set.reps || ''}
-                        placeholder={exType === 'cardio' ? 'мин' : '0'}
-                        onChange={(e) =>
-                          updateSet(pe.id, idx, { reps: parseInt(e.target.value) || 0 })
-                        }
-                        className="flex-1 bg-bg border border-border rounded-lg px-2 py-2 text-sm text-text text-center focus:border-accent outline-none"
-                      />
-                      <span className="text-text-secondary text-xs w-4 text-center">
-                        {exType === 'cardio' ? '|' : '×'}
+              {sets.map((set, idx) =>
+                exType === 'cardio' ? (
+                  <div key={idx} className="space-y-1 px-2">
+                    {/* Row 1: duration | speed | delete */}
+                    <div className="flex items-center gap-1.5 w-full overflow-hidden">
+                      <span className="w-5 shrink-0 text-text-secondary text-xs text-center">
+                        {idx + 1}
                       </span>
                       <input
                         type="number"
                         inputMode="decimal"
-                        value={exType === 'bodyweight' ? (set.weight || '') : (set.weight || '')}
-                        placeholder={exType === 'bodyweight' ? '—' : '0'}
+                        value={set.duration || ''}
+                        placeholder="0"
                         onChange={(e) =>
-                          updateSet(pe.id, idx, {
-                            weight: parseFloat(e.target.value) || 0,
-                          })
+                          updateSet(pe.id, idx, { duration: parseInt(e.target.value) || 0 })
                         }
-                        className="flex-1 bg-bg border border-border rounded-lg px-2 py-2 text-sm text-text text-center focus:border-accent outline-none"
+                        className="flex-1 min-w-0 bg-bg border border-border rounded-lg px-1 py-2 text-sm text-text text-center focus:border-accent outline-none"
                       />
-                    </>
-                  )}
-                  <button
-                    onClick={() => handleRemoveSet(pe.id, idx)}
-                    disabled={sets.length <= 1}
-                    className="text-text-secondary hover:text-danger disabled:opacity-30 transition-colors p-1 w-7 flex justify-center"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM6.75 9.25a.75.75 0 000 1.5h6.5a.75.75 0 000-1.5h-6.5z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
+                      <span className="shrink-0 px-1 text-text-secondary text-xs text-center">|</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={set.speed || ''}
+                        placeholder="0"
+                        onChange={(e) =>
+                          updateSet(pe.id, idx, { speed: parseFloat(e.target.value) || 0 })
+                        }
+                        className="flex-1 min-w-0 bg-bg border border-border rounded-lg px-1 py-2 text-sm text-text text-center focus:border-accent outline-none"
+                      />
+                      <button
+                        onClick={() => handleRemoveSet(pe.id, idx)}
+                        disabled={sets.length <= 1}
+                        className="w-8 shrink-0 text-text-secondary hover:text-danger disabled:opacity-30 transition-colors p-1 flex justify-center"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM6.75 9.25a.75.75 0 000 1.5h6.5a.75.75 0 000-1.5h-6.5z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                    {/* Row 2: incline | distance */}
+                    <div className="flex items-center gap-1.5 w-full overflow-hidden pl-7">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={set.incline || ''}
+                        placeholder="0"
+                        onChange={(e) =>
+                          updateSet(pe.id, idx, { incline: parseFloat(e.target.value) || 0 })
+                        }
+                        className="flex-1 min-w-0 bg-bg border border-border rounded-lg px-1 py-2 text-sm text-text text-center focus:border-accent outline-none"
+                      />
+                      <span className="shrink-0 px-1 text-text-secondary text-xs text-center">|</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={set.distance || ''}
+                        placeholder="0"
+                        onChange={(e) =>
+                          updateSet(pe.id, idx, { distance: parseFloat(e.target.value) || 0 })
+                        }
+                        className="flex-1 min-w-0 bg-bg border border-border rounded-lg px-1 py-2 text-sm text-text text-center focus:border-accent outline-none"
+                      />
+                      <span className="w-8 shrink-0" />
+                    </div>
+                  </div>
+                ) : (
+                  <div key={idx} className="flex items-center gap-1.5 w-full overflow-hidden px-2">
+                    <span className="w-5 shrink-0 text-text-secondary text-xs text-center">
+                      {idx + 1}
+                    </span>
+                    {exType === 'timed' ? (
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={set.reps || ''}
+                        placeholder="0"
+                        onChange={(e) =>
+                          updateSet(pe.id, idx, { reps: parseInt(e.target.value) || 0 })
+                        }
+                        className="flex-1 min-w-0 bg-bg border border-border rounded-lg px-1 py-2 text-sm text-text text-center focus:border-accent outline-none"
+                      />
+                    ) : (
+                      <>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={set.reps || ''}
+                          placeholder="0"
+                          onChange={(e) =>
+                            updateSet(pe.id, idx, { reps: parseInt(e.target.value) || 0 })
+                          }
+                          className="flex-1 min-w-0 bg-bg border border-border rounded-lg px-1 py-2 text-sm text-text text-center focus:border-accent outline-none"
+                        />
+                        <span className="shrink-0 px-1 text-text-secondary text-xs text-center">×</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          value={set.weight || ''}
+                          placeholder={exType === 'bodyweight' ? '—' : '0'}
+                          onChange={(e) =>
+                            updateSet(pe.id, idx, {
+                              weight: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="flex-1 min-w-0 bg-bg border border-border rounded-lg px-1 py-2 text-sm text-text text-center focus:border-accent outline-none"
+                        />
+                      </>
+                    )}
+                    <button
+                      onClick={() => handleRemoveSet(pe.id, idx)}
+                      disabled={sets.length <= 1}
+                      className="w-8 shrink-0 text-text-secondary hover:text-danger disabled:opacity-30 transition-colors p-1 flex justify-center"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM6.75 9.25a.75.75 0 000 1.5h6.5a.75.75 0 000-1.5h-6.5z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                ),
+              )}
             </div>
 
             {/* Add set */}

@@ -195,6 +195,12 @@ Claude вызывает `create_workout_plan` tool со структуриров
 - **Pre-fill приоритет**: localEdits → оригинальное значение → plan fallback → пустая строка
 - **Rest timer**: `restSeconds` из `WorkoutPlanExercise` per exercise, передаётся динамически
 
+### Фиксы верстки превью плана (2026-03-13)
+
+- **Overflow fix**: строки подходов — `flex items-center gap-1.5 w-full overflow-hidden px-2`, `w-5 shrink-0` (#), `flex-1 min-w-0` (инпуты), `shrink-0 px-1` (разделитель), `w-8 shrink-0` (кнопка удалить)
+- **Кардио 4 поля**: две строки — длит.(мин) + скор.(км/ч) | наклон(%) + дист.(км), аналогично active/page.tsx
+- **Добавление упражнения**: `addedExercises` state мержится с `planExercises` в `visibleExercises`, иначе новое упражнение не отображалось (props не обновлялись)
+
 ## Environment Variables (.env)
 
 - `DATABASE_URL` — PostgreSQL connection string

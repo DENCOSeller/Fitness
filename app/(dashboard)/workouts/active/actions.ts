@@ -43,6 +43,85 @@ export async function getActiveWorkout() {
   return { workout };
 }
 
+export async function startPlannedWorkout(
+  workoutId: number,
+  overrides?: { planExerciseId: number; sets: { reps: number; weight: number }[] }[],
+) {
+  const userId = await getCurrentUserId();
+
+  const existing = await prisma.workout.findFirst({
+    where: { userId, status: 'in_progress' },
+  });
+  if (existing) {
+    return { error: 'У вас уже есть незавершённая тренировка', workoutId: existing.id };
+  }
+
+  const planned = await prisma.workout.findUnique({
+    where: { id: workoutId },
+    include: {
+      planExercises: {
+        include: { exercise: true },
+        orderBy: { sortOrder: 'asc' },
+      },
+      sets: true,
+    },
+  });
+  if (!planned || planned.userId !== userId) {
+    return { error: 'Тренировка не найдена' };
+  }
+  if (planned.status !== 'planned') {
+    return { error: 'Тренировка уже начата или завершена' };
+  }
+
+  // Create WorkoutSets from planExercises (or overrides)
+  if (planned.sets.length === 0 && planned.planExercises.length > 0) {
+    const setsToCreate: {
+      workoutId: number;
+      exerciseId: number;
+      setOrder: number;
+      reps: number;
+      weight: number;
+      completed: boolean;
+    }[] = [];
+
+    for (const [peIdx, pe] of planned.planExercises.entries()) {
+      if (!pe.exerciseId) continue;
+
+      const override = overrides?.find((o) => o.planExerciseId === pe.id);
+      const setCount = override ? override.sets.length : pe.plannedSets;
+
+      for (let i = 0; i < setCount; i++) {
+        setsToCreate.push({
+          workoutId,
+          exerciseId: pe.exerciseId,
+          setOrder: peIdx * 100 + i + 1,
+          reps: override ? override.sets[i].reps : pe.plannedReps,
+          weight: override ? override.sets[i].weight : (pe.plannedWeight ?? 0),
+          completed: false,
+        });
+      }
+    }
+
+    if (setsToCreate.length > 0) {
+      await prisma.workoutSet.createMany({ data: setsToCreate });
+    }
+  }
+
+  const now = new Date();
+  const workout = await prisma.workout.update({
+    where: { id: workoutId },
+    data: { status: 'in_progress', startedAt: now },
+    include: {
+      sets: {
+        include: { exercise: true },
+        orderBy: { setOrder: 'asc' },
+      },
+    },
+  });
+
+  return { workout };
+}
+
 export async function addExerciseToWorkout(workoutId: number, exerciseId: number) {
   const userId = await getCurrentUserId();
 

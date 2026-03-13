@@ -127,6 +127,26 @@ Claude вызывает `create_workout_plan` tool со структуриров
 
 `getLastWeightsForExercises(userId, exerciseIds[])` — один SQL запрос (`DISTINCT ON`), возвращает последний вес из completed тренировок. Используется в `workout-from-plan.ts`: приоритет весов AI → история → null/0.
 
+## Editable Plan Preview (Chunk 5 Sprint: Plan Editing)
+
+### Server Actions (`app/(dashboard)/workouts/plan-actions.ts`)
+
+7 actions для редактирования плана ДО старта тренировки:
+`getWorkoutWithPlan`, `updatePlanExercise`, `addSetToPlan`, `removeSetFromPlan`, `addExerciseToPlan`, `removeExerciseFromPlan`, `updateRestSeconds`
+
+- `getWorkoutWithPlan` — загружает workout + planExercises + last weights (история по каждому упражнению)
+- Все actions проверяют userId + status='planned'
+
+### Workout Detail (`app/(dashboard)/workouts/[id]/page.tsx`)
+
+Два вида:
+- **PlanPreview** (status='planned') — редактируемые подходы (per-set в локальном стейте), добавление/удаление упражнений (ExercisePicker), кликабельный отдых, подсказки "последний раз", sticky зелёная кнопка "Начать тренировку"
+- **CompletedView** (status='completed') — прежний read-only вид
+
+### startPlannedWorkout (active/actions.ts)
+
+Принимает optional `overrides: { planExerciseId, sets[] }[]` — per-set данные из клиентского стейта. Создаёт `WorkoutSet` из `planExercises` с учётом правок пользователя.
+
 ## Environment Variables (.env)
 
 - `DATABASE_URL` — PostgreSQL connection string

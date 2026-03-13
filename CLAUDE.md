@@ -123,6 +123,10 @@ pm2 restart denco-health   # Рестарт
 
 Claude вызывает `create_workout_plan` tool со структурированными данными (exercises, weight_kg, rest_seconds). Стриминг обрабатывает `input_json_delta` → отправляет `{ tool_use }` по SSE. Клиент (`ai/trainer/page.tsx`) использует tool_use данные с приоритетом над regex-парсером. Системный промпт (`lib/ai-trainer.ts`) обязывает AI указывать веса и время отдыха.
 
+### Weight History Fallback (`lib/exercise-history.ts`)
+
+`getLastWeightsForExercises(userId, exerciseIds[])` — один SQL запрос (`DISTINCT ON`), возвращает последний вес из completed тренировок. Используется в `workout-from-plan.ts`: приоритет весов AI → история → null/0.
+
 ## Environment Variables (.env)
 
 - `DATABASE_URL` — PostgreSQL connection string
